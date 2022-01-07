@@ -28,11 +28,6 @@ final case class field(name: String) extends Annotation
  * if you must model an externally defined schema.
  */
 final case class discriminator(name: String) extends Annotation
-// TODO a strategy where the constructor is inferred from the field names, only
-// valid if there is no ambiguity in the types of fields for all case classes.
-// Such a strategy cannot be implemented with Magnolia because the SealedTrait
-// does not provide a mechanism for obtaining the CaseClass associated to the
-// Subtype.
 
 /**
  * If used on a case class will determine the typehint value for disambiguating
@@ -67,7 +62,7 @@ object MagnoliaDecoder {
             Lexer.char(trace, in, '{')
             Lexer.char(trace, in, '}')
           } else {
-            Lexer.skipValue(trace, in)
+            Lexer.skipValue(trace, in, null)
           }
           ctx.rawConstruct(Nil)
         }
@@ -88,13 +83,6 @@ object MagnoliaDecoder {
         def unsafeDecode(trace: List[JsonError], in: RetractReader): A = {
           Lexer.char(trace, in, '{')
 
-          // TODO it would be more efficient to have a solution that didn't box
-          // primitives, but Magnolia does not expose an API for that. Adding
-          // such a feature to Magnolia is the only way to avoid this, e.g. a
-          // ctx.createMutableCons that specialises on the types (with some way
-          // of noting that things have been initialised), which can be called
-          // to instantiate the case class. Would also require Decoder to be
-          // specialised.
           val ps: Array[Any] = Array.ofDim(len)
 
           if (Lexer.firstObject(trace, in))
@@ -112,7 +100,7 @@ object MagnoliaDecoder {
                   JsonError.Message(s"invalid extra field") :: trace
                 )
               } else
-                Lexer.skipValue(trace_, in)
+                Lexer.skipValue(trace_, in, null)
             } while (Lexer.nextObject(trace, in))
 
           var i = 0
@@ -165,31 +153,52 @@ object MagnoliaDecoder {
       }
     else
       new Decoder[A] {
-        val hintfield               = discrim.get
-        val hintmatrix              = new StringMatrix(Array(hintfield))
-        val spans: Array[JsonError] = names.map(JsonError.Message(_))
+        val hintfield = discrim.get
 
         def unsafeDecode(trace: List[JsonError], in: RetractReader): A = {
-          val in_ = internal.RecordingReader(in)
-          Lexer.char(trace, in_, '{')
-          if (Lexer.firstObject(trace, in_))
-            do {
-              if (Lexer.field(trace, in_, hintmatrix) != -1) {
-                val field = Lexer.enum(trace, in_, matrix)
-                if (field == -1)
-                  throw UnsafeJson(
-                    JsonError.Message(s"invalid disambiguator") :: trace
-                  )
-                in_.rewind()
-                val trace_ = spans(field) :: trace
-                return tcs(field).unsafeDecode(trace_, in_).asInstanceOf[A]
-              } else
-                Lexer.skipValue(trace, in_)
-            } while (Lexer.nextObject(trace, in_))
+          var fields: List[(CharSequence, CharSequence)] = Nil
+          var hint: Int                                  = -1
 
-          throw UnsafeJson(
-            JsonError.Message(s"missing hint '$hintfield'") :: trace
-          )
+          Lexer.char(trace, in, '{')
+          if (Lexer.firstObject(trace, in))
+            do {
+              // materialise the string since we don't know what it can be
+              val field = Lexer.string(trace, in)
+              Lexer.char(trace, in, ':')
+
+              if (hintfield.contentEquals(field)) {
+                if (hint != -1)
+                  throw UnsafeJson(JsonError.Message(s"duplicate disambiguator '$hintfield'") :: trace)
+                hint = Lexer.ordinal(trace, in, matrix)
+                if (hint == -1)
+                  throw UnsafeJson(JsonError.Message(s"invalid disambiguator in '$hintfield'") :: trace)
+                // TODO now we know the hint, we can further filter unneeded fields
+              } else {
+                // TODO only retain fields that we will care about later
+                val out = new internal.FastStringWriter(1024)
+                Lexer.skipValue(trace, in, out)
+                fields ::= (field -> out.buffer) // duplicates will be caught later
+              }
+            } while (Lexer.nextObject(trace, in))
+
+          if (hint == -1)
+            throw UnsafeJson(JsonError.Message(s"missing disambiguator '$hintfield'") :: trace)
+
+          val reconstructed = new internal.FastStringWriter(1024)
+          reconstructed.append("{")
+          var first = true
+          fields.foreach {
+            case (name, value) =>
+              if (first) first = false
+              else reconstructed.append(',')
+              Encoder.charseq.unsafeEncode(name, None, reconstructed)
+              reconstructed.append(':')
+              reconstructed.append(value)
+          }
+          reconstructed.append("}")
+          fields = Nil // allows immediate GC of the values
+
+          tcs(hint).unsafeDecode(trace, new internal.FastStringReader(reconstructed.buffer)).asInstanceOf[A]
         }
       }
   }

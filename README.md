@@ -13,7 +13,7 @@ Extreme **performance** is achieved by decoding JSON directly from the input sou
 
 Best in class **security** is achieved with an aggressive *early exit* strategy that avoids costly stacktraces, even when parsing malformed numbers. Malicious (and badly formed) payloads are rejected before finishing reading.
 
-**Fast compilation** and **future proofing** is possible thanks to [Magnolia](https://propensive.com/opensource/magnolia/) which allows us to generate boilerplate in a way that will survive the exodus to Scala 3. `zio-json` is internally implemented using the [`java.io.Reader`](https://docs.oracle.com/en/java/javase/14/docs/api/java.base/java/io/Reader.html) interface which is making a comeback to center stage in Loom.
+**Fast compilation** and **future proofing** is possible thanks to [Magnolia](https://propensive.com/opensource/magnolia/) which allows us to generate boilerplate in a way that will survive the exodus to Scala 3. `zio-json` is internally implemented using a [`java.io.Reader`](https://docs.oracle.com/en/java/javase/14/docs/api/java.base/java/io/Reader.html)-like interface which is making a comeback to center stage in Loom.
 
 **Simplicity** is achieved by using well-known software patterns and avoiding bloat. The only requirement to use this library is to know about Scala's encoding of typeclasses, described in [Functional Programming for Mortals](https://leanpub.com/fpmortals/read#leanpub-auto-functionality).
 
@@ -318,17 +318,18 @@ circe  16010 ±  72   1349 ±  6     | 15664 ± 209  1627 ± 22
 play    5256 ± 165   1231 ± 39     | 15580 ± 314  2260 ± 45
 ```
 
-on a standard GeoJSON performance-testing dataset (stressing nested sealed traits that use a discriminator)
+on a standard GeoJSON performance-testing dataset (stressing nested sealed traits that use a discriminator). Note that the `alt` decoder is manually written to avoid using the default discriminator handling.
 
 <!-- jmh:run -prof gc GeoJSON.*Success1 -->
 <!-- jmh:run -prof gc GeoJSON.*encode* -->
 
 ```
-       Decoding                    | Encoding
-       ops/sec       MB/sec        | ops/sec       MB/sec
-zio    17104 ± 155   2768 ± 25     | 6031 ± 63      522 ±  6
-circe   8388 ± 118   2879 ± 41     | 4762 ± 47      592 ±  6
-play     704 ±   9   3946 ± 55     | 2587 ± 24     1091 ± 10
+          Decoding                    | Encoding
+          ops/sec       MB/sec        | ops/sec       MB/sec
+zio        4375 ±  46   1306 ±  14    | 6031 ± 63      522 ±  6
+zio (alt) 18239 ± 753   2440 ± 102    |
+circe      8388 ± 118   2879 ±  41    | 4762 ± 47      592 ±  6
+play        704 ±   9   3946 ±  55    | 2587 ± 24     1091 ± 10
 ```
 
 and on a standard synthetic performance-testing dataset (stressing nested recursive types)

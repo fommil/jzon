@@ -23,8 +23,6 @@ sealed abstract class JsValue {
   override def toString = JsValue.encoder.toJson(this, None)
 }
 
-// TODO lens-like accessors for working with arbitrary json values
-
 final case class JsObject(fields: List[(String, JsValue)]) extends JsValue
 final case class JsArray(elements: List[JsValue])          extends JsValue
 final case class JsBoolean(value: Boolean)                 extends JsValue

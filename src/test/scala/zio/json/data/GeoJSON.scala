@@ -178,14 +178,14 @@ package handrolled {
           if (Lexer.firstObject(trace, in))
             do {
               val field = Lexer.field(trace, in, matrix)
-              if (field == -1) Lexer.skipValue(trace, in)
+              if (field == -1) Lexer.skipValue(trace, in, null)
               else {
                 val trace_ = spans(field) :: trace
                 (field: @switch) match {
                   case 0 =>
                     if (subtype != -1)
                       throw UnsafeJson(JsonError.Message("duplicate") :: trace_)
-                    subtype = Lexer.enum(trace_, in, subtypes)
+                    subtype = Lexer.ordinal(trace_, in, subtypes)
                   case 1 =>
                     if (coordinates != null)
                       throw UnsafeJson(JsonError.Message("duplicate") :: trace_)
@@ -283,7 +283,7 @@ package handrolled {
           if (Lexer.firstObject(trace, in))
             do {
               val field = Lexer.field(trace, in, matrix)
-              if (field == -1) Lexer.skipValue(trace, in)
+              if (field == -1) Lexer.skipValue(trace, in, null)
               else {
                 val trace_ = spans(field) :: trace
                 (field: @switch) match {
@@ -291,7 +291,7 @@ package handrolled {
                     if (subtype != -1)
                       throw UnsafeJson(JsonError.Message("duplicate") :: trace_)
 
-                    subtype = Lexer.enum(trace_, in, subtypes)
+                    subtype = Lexer.ordinal(trace_, in, subtypes)
                   case 1 =>
                     if (properties != null)
                       throw UnsafeJson(JsonError.Message("duplicate") :: trace_)

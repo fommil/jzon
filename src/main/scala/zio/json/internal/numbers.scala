@@ -1,6 +1,5 @@
 package zio.json.internal
 
-import java.io._
 import scala.util.control.NoStackTrace
 
 /**
@@ -31,48 +30,91 @@ import scala.util.control.NoStackTrace
  *
  * Results are contained in a specialisation of Option that avoids boxing.
  */
-// TODO hex radix
-// TODO octal radix
 object SafeNumbers {
   import UnsafeNumbers.UnsafeNumber
 
+  private def consumed(in: FastStringReader): Unit =
+    if (!in.consumed()) throw UnsafeNumber
+
   def byte(num: String): ByteOption =
-    try ByteSome(UnsafeNumbers.byte(num))
-    catch { case UnsafeNumber => ByteNone }
+    try {
+      val in = new FastStringReader(num)
+      val b  = ByteSome(UnsafeNumbers.byte(in))
+      consumed(in)
+      b
+    } catch {
+      case UnsafeNumber | UnexpectedEnd => ByteNone
+    }
 
   def short(num: String): ShortOption =
-    try ShortSome(UnsafeNumbers.short(num))
-    catch { case UnsafeNumber => ShortNone }
+    try {
+      val in = new FastStringReader(num)
+      val s  = ShortSome(UnsafeNumbers.short(in))
+      consumed(in)
+      s
+    } catch {
+      case UnsafeNumber | UnexpectedEnd => ShortNone
+    }
 
   def int(num: String): IntOption =
-    try IntSome(UnsafeNumbers.int(num))
-    catch { case UnsafeNumber => IntNone }
+    try {
+      val in = new FastStringReader(num)
+      val i  = IntSome(UnsafeNumbers.int(in))
+      consumed(in)
+      i
+    } catch {
+      case UnsafeNumber | UnexpectedEnd => IntNone
+    }
 
   def long(num: String): LongOption =
-    try LongSome(UnsafeNumbers.long(num))
-    catch { case UnsafeNumber => LongNone }
+    try {
+      val in = new FastStringReader(num)
+      val l  = LongSome(UnsafeNumbers.long(in))
+      consumed(in)
+      l
+    } catch {
+      case UnsafeNumber | UnexpectedEnd => LongNone
+    }
 
-  def biginteger(
-    num: String,
-    max_bits: Int = 128
-  ): Option[java.math.BigInteger] =
-    try Some(UnsafeNumbers.biginteger(num, max_bits))
-    catch { case UnsafeNumber => None }
+  def biginteger(num: String, max_bits: Int = 128): Option[java.math.BigInteger] =
+    try {
+      val in = new FastStringReader(num)
+      val bi = Some(UnsafeNumbers.biginteger(in, max_bits))
+      consumed(in)
+      bi
+    } catch {
+      case UnsafeNumber | UnexpectedEnd => None
+    }
 
   def float(num: String, max_bits: Int = 128): FloatOption =
-    try FloatSome(UnsafeNumbers.float(num, max_bits))
-    catch { case UnsafeNumber => FloatNone }
+    try {
+      val in = new FastStringReader(num)
+      val f  = FloatSome(UnsafeNumbers.float(in, max_bits))
+      consumed(in)
+      f
+    } catch {
+      case UnsafeNumber | UnexpectedEnd => FloatNone
+    }
 
   def double(num: String, max_bits: Int = 128): DoubleOption =
-    try DoubleSome(UnsafeNumbers.double(num, max_bits))
-    catch { case UnsafeNumber => DoubleNone }
+    try {
+      val in = new FastStringReader(num)
+      val d  = DoubleSome(UnsafeNumbers.double(in, max_bits))
+      consumed(in)
+      d
+    } catch {
+      case UnsafeNumber | UnexpectedEnd => DoubleNone
+    }
 
-  def bigdecimal(
-    num: String,
-    max_bits: Int = 128
-  ): Option[java.math.BigDecimal] =
-    try Some(UnsafeNumbers.bigdecimal(num, max_bits))
-    catch { case UnsafeNumber => None }
+  def bigdecimal(num: String, max_bits: Int = 128): Option[java.math.BigDecimal] =
+    try {
+      val in = new FastStringReader(num)
+      val bd = Some(UnsafeNumbers.bigdecimal(in, max_bits))
+      consumed(in)
+      bd
+    } catch {
+      case UnsafeNumber | UnexpectedEnd => None
+    }
 
 }
 
@@ -158,7 +200,7 @@ case class DoubleSome(value: Double) extends DoubleOption {
 // the happy path.
 //
 // This API should only be used by people who know what they are doing. Note
-// that Reader implementations consume one character beyond the number that is
+// that _ implementations consume one character beyond the number that is
 // parsed, because there is no terminator character.
 object UnsafeNumbers {
 
@@ -169,33 +211,19 @@ object UnsafeNumbers {
       )
       with NoStackTrace
 
-  def byte(num: String): Byte =
-    byte_(new FastStringReader(num), true)
-  def byte_(in: Reader, consume: Boolean): Byte =
-    long__(in, Byte.MinValue, Byte.MaxValue, consume).toByte
+  def byte(in: OneCharReader): Byte =
+    long_(in, Byte.MinValue, Byte.MaxValue).toByte
 
-  def short(num: String): Short =
-    short_(new FastStringReader(num), true)
-  def short_(in: Reader, consume: Boolean): Short =
-    long__(in, Short.MinValue, Short.MaxValue, consume).toShort
+  def short(in: OneCharReader): Short =
+    long_(in, Short.MinValue, Short.MaxValue).toShort
 
-  def int(num: String): Int =
-    int_(new FastStringReader(num), true)
-  def int_(in: Reader, consume: Boolean): Int =
-    long__(in, Int.MinValue, Int.MaxValue, consume).toInt
+  def int(in: OneCharReader): Int =
+    long_(in, Int.MinValue, Int.MaxValue).toInt
 
-  def long(num: String): Long =
-    long_(new FastStringReader(num), true)
-  def long_(in: Reader, consume: Boolean): Long =
-    long__(in, Long.MinValue, Long.MaxValue, consume)
+  def long(in: OneCharReader): Long =
+    long_(in, Long.MinValue, Long.MaxValue)
 
-  def biginteger(num: String, max_bits: Int): java.math.BigInteger =
-    biginteger_(new FastStringReader(num), true, max_bits)
-  def biginteger_(
-    in: Reader,
-    consume: Boolean,
-    max_bits: Int
-  ): java.math.BigInteger = {
+  def biginteger(in: OneCharReader, max_bits: Int): java.math.BigInteger = {
     var current: Int = in.read()
     var negative     = false
 
@@ -206,16 +234,16 @@ object UnsafeNumbers {
       current = in.read()
     if (current == -1) throw UnsafeNumber
 
-    bigdecimal__(in, consume, negative, current, true, max_bits).unscaledValue
+    bigdecimal_(in, negative, current, true, max_bits).unscaledValue
   }
 
   // measured faster than Character.isDigit
   @inline private[this] def isDigit(i: Int): Boolean =
     '0' <= i && i <= '9'
 
-  // is it worth keeping this custom long__ instead of using biginteger since it
+  // is it worth keeping this custom long_ instead of using biginteger since it
   // is approximately double the performance.
-  def long__(in: Reader, lower: Long, upper: Long, consume: Boolean): Long = {
+  private def long_(in: OneCharReader, lower: Long, upper: Long): Long = {
     var current: Int = 0
 
     current = in.read()
@@ -246,8 +274,6 @@ object UnsafeNumbers {
       current = in.read()
     } while (current != -1 && isDigit(current))
 
-    if (consume && current != -1) throw UnsafeNumber
-
     if (negative)
       if (accum < lower || upper < accum) throw UnsafeNumber
       else accum
@@ -260,14 +286,52 @@ object UnsafeNumbers {
     }
   }
 
-  def float(num: String, max_bits: Int): Float =
-    float_(new FastStringReader(num), true, max_bits)
-  def float_(in: Reader, consume: Boolean, max_bits: Int): Float =
-    double_(in, consume, max_bits).toFloat
+  def float(in: OneCharReader, max_bits: Int): Float = {
+    var current: Int = in.read()
+    var negative     = false
 
-  def double(num: String, max_bits: Int): Double =
-    double_(new FastStringReader(num), true, max_bits)
-  def double_(in: Reader, consume: Boolean, max_bits: Int): Double = {
+    def readall(s: String): Unit = {
+      var i   = 0
+      val len = s.length
+
+      while (i < len) {
+        current = in.read()
+        if (current != s(i)) throw UnsafeNumber
+        i += 1
+      }
+
+      current = in.read() // to be consistent read the terminator
+    }
+
+    if (current == 'N') {
+      readall("aN")
+      return Float.NaN
+    }
+
+    if (current == '-') {
+      negative = true
+      current = in.read()
+    } else if (current == '+') {
+      current = in.read()
+    }
+
+    if (current == 'I') {
+      readall("nfinity")
+
+      if (negative) return Float.NegativeInfinity
+      else return Float.PositiveInfinity
+    }
+
+    if (current == -1)
+      throw UnsafeNumber
+
+    val res = bigdecimal_(in, negative = negative, initial = current, int_only = false, max_bits = max_bits)
+
+    if (negative && res.unscaledValue == java.math.BigInteger.ZERO) -0.0f
+    else res.floatValue
+  }
+
+  def double(in: OneCharReader, max_bits: Int): Double = {
     var current: Int = in.read()
     var negative     = false
 
@@ -280,7 +344,6 @@ object UnsafeNumbers {
         i += 1
       }
       current = in.read() // to be consistent read the terminator
-      if (consume && current != -1) throw UnsafeNumber
     }
 
     if (current == 'N') {
@@ -311,20 +374,14 @@ object UnsafeNumbers {
     // ultimately uses strtod from the system libraries and they may loop until
     // the answer converges
     // https://github.com/rust-lang/rust/pull/27307/files#diff-fe6c36003393c49bf7e5c413458d6d9cR43-R84
-    val res = bigdecimal__(in, consume, negative, current, false, max_bits)
+    val res = bigdecimal_(in, negative, current, false, max_bits)
     // BigDecimal doesn't have a negative zero, so we need to apply manually
     if (negative && res.unscaledValue == java.math.BigInteger.ZERO) -0.0
-    // TODO implement Algorithm M or Bigcomp and avoid going via BigDecimal
+    // could implement Algorithm M or Bigcomp and avoid going via BigDecimal
     else res.doubleValue
   }
 
-  def bigdecimal(num: String, max_bits: Int): java.math.BigDecimal =
-    bigdecimal_(new FastStringReader(num), true, max_bits)
-  def bigdecimal_(
-    in: Reader,
-    consume: Boolean,
-    max_bits: Int
-  ): java.math.BigDecimal = {
+  def bigdecimal(in: OneCharReader, max_bits: Int): java.math.BigDecimal = {
     var current: Int = in.read()
     var negative     = false
 
@@ -335,12 +392,11 @@ object UnsafeNumbers {
       current = in.read()
     if (current == -1) throw UnsafeNumber
 
-    bigdecimal__(in, consume, negative, current, false, max_bits)
+    bigdecimal_(in, negative, current, false, max_bits)
   }
 
-  def bigdecimal__(
-    in: Reader,
-    consume: Boolean,
+  private def bigdecimal_(
+    in: OneCharReader,
     negative: Boolean,
     initial: Int,
     int_only: Boolean,
@@ -352,12 +408,6 @@ object UnsafeNumbers {
     var sig_ : java.math.BigInteger = null // non-null wins over sig
     var dot: Int                    = 0    // counts from the right
     var exp: Int                    = 0    // implied
-
-    def read(): Int = {
-      current = in.read()
-      if (current == -1) throw UnsafeNumber
-      current
-    }
 
     def advance(): Boolean = {
       current = in.read()
@@ -408,8 +458,6 @@ object UnsafeNumbers {
     }
 
     if (int_only) {
-      if (consume && current != -1)
-        throw UnsafeNumber
       return significand()
     }
 
@@ -430,9 +478,7 @@ object UnsafeNumbers {
     if (sig < 0) throw UnsafeNumber // no significand
 
     if (current == 'E' || current == 'e')
-      exp = int_(in, consume)
-    else if (consume && current != -1)
-      throw UnsafeNumber
+      exp = int(in)
 
     val scale = if (dot < 1) exp else exp - dot
     val res   = significand()
@@ -442,9 +488,9 @@ object UnsafeNumbers {
       res
   }
   // note that bigdecimal does not have a negative zero
-  val bigintegers: Array[java.math.BigInteger] =
+  private[this] val bigintegers: Array[java.math.BigInteger] =
     (0L to 9L).map(java.math.BigInteger.valueOf(_)).toArray
-  val longunderflow: Long = Long.MinValue / 10L
-  val longoverflow: Long  = Long.MaxValue / 10L
+  private[this] val longunderflow: Long = Long.MinValue / 10L
+  private[this] val longoverflow: Long  = Long.MaxValue / 10L
 
 }

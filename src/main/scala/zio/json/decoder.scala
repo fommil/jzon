@@ -31,7 +31,7 @@ trait Decoder[A] { self =>
     try Right(unsafeDecode(Nil, new FastStringReader(str)))
     catch {
       case Decoder.UnsafeJson(trace) => Left(JsonError.render(trace))
-      case _: internal.UnexpectedEnd => Left("unexpected end of input")
+      case internal.UnexpectedEnd    => Left("unexpected end of input")
     }
 
   // scalaz-deriving style MonadError combinators
@@ -189,7 +189,7 @@ object Decoder extends GeneratedTupleDecoders with DecoderLowPriority1 {
         if (Lexer.firstObject(trace, in))
           do {
             val field = Lexer.field(trace, in, matrix)
-            if (field == -1) Lexer.skipValue(trace, in)
+            if (field == -1) Lexer.skipValue(trace, in, null)
             else {
               val trace_ = spans(field) :: trace
               if (field < 3) {
@@ -292,7 +292,6 @@ private[json] trait DecoderLowPriority1 {
   implicit def hashmap[K: FieldDecoder, V: Decoder]: Decoder[immutable.HashMap[K, V]] =
     keylist[K, V].map(lst => immutable.HashMap(lst: _*))
 
-  // TODO these could be optimised...
   implicit def set[A: Decoder]: Decoder[Set[A]] = hashset[A].widen
   implicit def hashset[A: Decoder]: Decoder[immutable.HashSet[A]] =
     list[A].map(lst => immutable.HashSet(lst: _*))

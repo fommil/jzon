@@ -42,11 +42,6 @@ object TestUtils {
     new internal.FastCharSequence(str.toCharArray)
 
   def getResourceAsReader(res: String): internal.RetractReader =
-    new internal.WithRetractReader(
-      new java.io.InputStreamReader(
-        getClass.getClassLoader.getResourceAsStream(res),
-        "UTF-8"
-      )
-    )
+    new internal.FastStringReader(getResourceAsString(res))
 
 }

@@ -39,8 +39,8 @@ trait Encoder[A] { self =>
 object Encoder extends GeneratedTupleEncoders with EncoderLowPriority1 {
   def apply[A](implicit a: Encoder[A]): Encoder[A] = a
 
-  implicit val string: Encoder[String] = new Encoder[String] {
-    override def unsafeEncode(a: String, indent: Option[Int], out: java.io.Writer): Unit = {
+  implicit val charseq: Encoder[CharSequence] = new Encoder[CharSequence] {
+    override def unsafeEncode(a: CharSequence, indent: Option[Int], out: java.io.Writer): Unit = {
       out.write('"')
       var i   = 0
       val len = a.length
@@ -61,8 +61,8 @@ object Encoder extends GeneratedTupleEncoders with EncoderLowPriority1 {
       }
       out.write('"')
     }
-
   }
+  implicit val string: Encoder[String] = charseq.narrow
 
   private[this] def explicit[A](f: A => String): Encoder[A] = new Encoder[A] {
     def unsafeEncode(a: A, indent: Option[Int], out: java.io.Writer): Unit = out.write(f(a))
@@ -176,7 +176,6 @@ private[json] trait EncoderLowPriority1 {
     }
   }
 
-  // TODO these could be optimised...
   implicit def sortedmap[K: FieldEncoder, V: Encoder]: Encoder[collection.SortedMap[K, V]] =
     keylist[K, V].contramap(_.toList)
   implicit def map[K: FieldEncoder, V: Encoder]: Encoder[Map[K, V]] =

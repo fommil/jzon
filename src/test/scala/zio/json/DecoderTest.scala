@@ -110,10 +110,13 @@ object DecoderTest extends TestSuite {
       json.parser.decode[Parent]("""{"hint":"Cain"}""") ==> Right(Child1())
       json.parser.decode[Parent]("""{"hint":"Abel"}""") ==> Right(Child2())
       json.parser.decode[Parent]("""{"hint":"Samson"}""") ==> Left(
-        "(invalid disambiguator)"
+        "(invalid disambiguator in 'hint')"
       )
       json.parser.decode[Parent]("""{"Cain":{}}""") ==> Left(
-        "(missing hint 'hint')"
+        "(missing disambiguator 'hint')"
+      )
+      json.parser.decode[Parent]("""{"hint":"Cain", "hint":"Cain"}""") ==> Left(
+        "(duplicate disambiguator 'hint')"
       )
     }
 
@@ -192,7 +195,6 @@ object DecoderTest extends TestSuite {
         circe.parser.decode[GeoJSON](getResourceAsString("che-2.geo.json"))
       val input = getResourceAsReader("che-2.geo.json")
       val got   = json.Decoder[GeoJSON].unsafeDecode(Nil, input)
-      input.close()
       Right(got) ==> expected
     }
 
@@ -272,8 +274,6 @@ object DecoderTest extends TestSuite {
     test("jawn test data: ugh10k") {
       testAst("ugh10k")
     }
-
-    // TODO it would be good to test with https://github.com/nst/JSONTestSuite
   }
 
   def testAst(name: String) = {

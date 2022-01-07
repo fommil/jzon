@@ -8,9 +8,6 @@ import scala.util.Properties.propOrNone
 //
 // https://www.json.org/json-en.html
 object Lexer {
-  // TODO need a variant that doesn't skip whitespace, so that attack vectors
-  // consisting of an infinite stream of space can exit early.
-
   val NumberMaxBits: Int = propOrNone("zio.json.number.bits").getOrElse("128").toInt
 
   // True if we got a string (implies a retraction), False for }
@@ -64,12 +61,12 @@ object Lexer {
     in: OneCharReader,
     matrix: StringMatrix
   ): Int = {
-    val f = enum(trace, in, matrix)
+    val f = ordinal(trace, in, matrix)
     char(trace, in, ':')
     f
   }
 
-  def enum(
+  def ordinal(
     trace: List[JsonError],
     in: OneCharReader,
     matrix: StringMatrix
@@ -90,47 +87,86 @@ object Lexer {
   private[this] val ull: Array[Char]  = "ull".toCharArray
   private[this] val alse: Array[Char] = "alse".toCharArray
   private[this] val rue: Array[Char]  = "rue".toCharArray
-  def skipValue(trace: List[JsonError], in: RetractReader): Unit =
-    (in.nextNonWhitespace(): @switch) match {
-      case 'n' => readChars(trace, in, ull, "null")
-      case 'f' => readChars(trace, in, alse, "false")
-      case 't' => readChars(trace, in, rue, "true")
+
+  // if out is non-null then the JSON is written as it is read, up to
+  // normalisation. If an exception is thrown, the contents of the Writer are
+  // undefined.
+  def skipValue(trace: List[JsonError], in: RetractReader, out: java.io.Writer): Unit = {
+    val next = in.nextNonWhitespace()
+    if (out ne null) out.append(next)
+    (next: @switch) match {
+      case 'n' =>
+        readChars(trace, in, ull, "null")
+        if (out ne null) out.write(ull)
+      case 'f' =>
+        readChars(trace, in, alse, "false")
+        if (out ne null) out.write(alse)
+      case 't' =>
+        readChars(trace, in, rue, "true")
+        if (out ne null) out.write(rue)
       case '{' =>
+        var first = true
         if (firstObject(trace, in)) {
           do {
+            if (first) first = false
+            else if (out ne null) out.write(',')
             char(trace, in, '"')
-            skipString(trace, in)
+            if (out ne null) out.write('"')
+            skipString(trace, in, out)
             char(trace, in, ':')
-            skipValue(trace, in)
+            if (out ne null) out.write(':')
+            skipValue(trace, in, out)
           } while (nextObject(trace, in))
         }
+        if (out ne null) out.append('}')
       case '[' =>
+        var first = true
         if (firstArray(trace, in)) {
-          do skipValue(trace, in) while (nextArray(trace, in))
+          do {
+            if (first) first = false
+            else if (out ne null) out.write(',')
+            skipValue(trace, in, out)
+          } while (nextArray(trace, in))
         }
+        if (out ne null) out.append(']')
       case '"' =>
-        skipString(trace, in)
+        skipString(trace, in, out)
       case '-' | '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' =>
-        skipNumber(trace, in)
+        skipNumber(trace, in, out)
       case c => throw UnsafeJson(JsonError.Message(s"unexpected '$c'") :: trace)
     }
+  }
 
-  def skipNumber(trace: List[JsonError], in: RetractReader): Unit = {
-    while (isNumber(in.readChar())) {}
+  def skipNumber(trace: List[JsonError], in: RetractReader, out: java.io.Writer): Unit = {
+    var c: Char = ' '
+    try while ({ c = in.readChar(); isNumber(c) }) {
+      if (out ne null) out.append(c)
+    } catch {
+      case UnexpectedEnd => // top level number
+    }
     in.retract()
   }
 
-  def skipString(trace: List[JsonError], in: OneCharReader): Unit = {
-    val stream = new EscapedString(trace, in)
-    var i: Int = 0
-    do i = stream.read() while (i != -1)
+  def skipString(trace: List[JsonError], in: OneCharReader, out: java.io.Writer): Unit = {
+    var c: Char = ' '
+    var escaped = false
+    var end     = false
+
+    while (!end) {
+      c = in.readChar()
+      if (out ne null) out.append(c)
+
+      if (!escaped && c == '"') end = true
+      else if (escaped) escaped = false
+      else if (c == '\\') escaped = true
+    }
   }
 
   // useful for embedded documents, e.g. CSV contained inside JSON
   def streamingString(
     trace: List[JsonError],
     in: OneCharReader
-  ): java.io.Reader = {
+  ): OneCharReader = {
     char(trace, in, '"')
     new EscapedString(trace, in)
   }
@@ -166,7 +202,7 @@ object Lexer {
   def byte(trace: List[JsonError], in: RetractReader): Byte = {
     checkNumber(trace, in)
     try {
-      val i = UnsafeNumbers.byte_(in, false)
+      val i = UnsafeNumbers.byte(in)
       in.retract()
       i
     } catch {
@@ -178,7 +214,7 @@ object Lexer {
   def short(trace: List[JsonError], in: RetractReader): Short = {
     checkNumber(trace, in)
     try {
-      val i = UnsafeNumbers.short_(in, false)
+      val i = UnsafeNumbers.short(in)
       in.retract()
       i
     } catch {
@@ -190,7 +226,7 @@ object Lexer {
   def int(trace: List[JsonError], in: RetractReader): Int = {
     checkNumber(trace, in)
     try {
-      val i = UnsafeNumbers.int_(in, false)
+      val i = UnsafeNumbers.int(in)
       in.retract()
       i
     } catch {
@@ -202,7 +238,7 @@ object Lexer {
   def long(trace: List[JsonError], in: RetractReader): Long = {
     checkNumber(trace, in)
     try {
-      val i = UnsafeNumbers.long_(in, false)
+      val i = UnsafeNumbers.long(in)
       in.retract()
       i
     } catch {
@@ -217,7 +253,7 @@ object Lexer {
   ): java.math.BigInteger = {
     checkNumber(trace, in)
     try {
-      val i = UnsafeNumbers.biginteger_(in, false, NumberMaxBits)
+      val i = UnsafeNumbers.biginteger(in, NumberMaxBits)
       in.retract()
       i
     } catch {
@@ -229,7 +265,7 @@ object Lexer {
   def float(trace: List[JsonError], in: RetractReader): Float = {
     checkNumber(trace, in)
     try {
-      val i = UnsafeNumbers.float_(in, false, NumberMaxBits)
+      val i = UnsafeNumbers.float(in, NumberMaxBits)
       in.retract()
       i
     } catch {
@@ -241,7 +277,7 @@ object Lexer {
   def double(trace: List[JsonError], in: RetractReader): Double = {
     checkNumber(trace, in)
     try {
-      val i = UnsafeNumbers.double_(in, false, NumberMaxBits)
+      val i = UnsafeNumbers.double(in, NumberMaxBits)
       in.retract()
       i
     } catch {
@@ -256,7 +292,7 @@ object Lexer {
   ): java.math.BigDecimal = {
     checkNumber(trace, in)
     try {
-      val i = UnsafeNumbers.bigdecimal_(in, false, NumberMaxBits)
+      val i = UnsafeNumbers.bigdecimal(in, NumberMaxBits)
       in.retract()
       i
     } catch {
@@ -321,9 +357,7 @@ object Lexer {
 // A Reader for the contents of a string, taking care of the escaping.
 //
 // `read` can throw extra exceptions on badly formed input.
-private final class EscapedString(trace: List[JsonError], in: OneCharReader) extends java.io.Reader with OneCharReader {
-
-  def close(): Unit = in.close()
+final class EscapedString(trace: List[JsonError], in: OneCharReader) extends OneCharReader {
 
   private[this] var escaped = false
 
@@ -351,7 +385,7 @@ private final class EscapedString(trace: List[JsonError], in: OneCharReader) ext
   // callers expect to get an EOB so this is rare
   def readChar(): Char = {
     val v = read()
-    if (v == -1) throw new UnexpectedEnd
+    if (v == -1) throw UnexpectedEnd
     v.toChar
   }
 

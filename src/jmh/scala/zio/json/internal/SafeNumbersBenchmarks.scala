@@ -56,7 +56,7 @@ class SafeNumbersBenchInt {
   def decodeFommilValid(): Array[IntOption] = valids.map(SafeNumbers.int)
 
   @Benchmark
-  def decodeFommilValidUnsafe(): Array[Int] = valids.map(UnsafeNumbers.int)
+  def decodeFommilValidUnsafe(): Array[Int] = valids.map(s => UnsafeNumbers.int(new FastStringReader(s)))
 
   @Benchmark
   def decodeStdlibInvalid(): Array[IntOption] = invalids.map(stdlib)
@@ -120,7 +120,7 @@ class SafeNumbersBenchFloat {
 
   @Benchmark
   def decodeFommilUnsafeValid(): Array[Float] =
-    valids.map(UnsafeNumbers.float(_, 128))
+    valids.map(f => UnsafeNumbers.float(new FastStringReader(f), 128))
 
   @Benchmark
   def decodeStdlibInvalid(): Array[FloatOption] = invalids.map(stdlib)
@@ -187,7 +187,7 @@ class SafeNumbersBenchBigDecimal {
 
   @Benchmark
   def decodeFommilUnsafeValid(): Array[java.math.BigDecimal] =
-    valids.map(UnsafeNumbers.bigdecimal(_, 128))
+    valids.map(bd => UnsafeNumbers.bigdecimal(new FastStringReader(bd), 128))
 
   @Benchmark
   def decodeStdlibInvalid(): Array[Option[java.math.BigDecimal]] =
