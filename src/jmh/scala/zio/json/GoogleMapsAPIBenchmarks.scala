@@ -57,41 +57,41 @@ import scala.util.Try
 //, jvmArgs=Array("-XX:-OmitStackTraceInFastThrow"))
 //, jvmArgs=Array("-XX:-StackTraceInThrowable"))
 class GoogleMapsAPIBenchmarks {
-  var jsonString, jsonStringCompact, jsonStringErr, jsonStringErrParse, jsonStringErrNumber: String  = _
-  var jsonStringAttack0, jsonStringAttack1, jsonStringAttack2, jsonStringAttack3: String             = _
-  var jsonChars, jsonCharsCompact, jsonCharsErr, jsonCharsErrParse, jsonCharsErrNumber: CharSequence = _
-  var jsonCharsAttack0, jsonCharsAttack1, jsonCharsAttack2, jsonCharsAttack3: CharSequence           = _
-  var decoded: DistanceMatrix                                                                        = _
+  var jsonString, jsonStringCompact, jsonStringErr, jsonStringErrParse, jsonStringErrNumber: String = _
+  var jsonStringAttack0, jsonStringAttack1, jsonStringAttack2, jsonStringAttack3: String            = _
+  var jsonBytes, jsonBytesCompact, jsonBytesErr, jsonBytesErrParse, jsonBytesErrNumber: Array[Byte] = _
+  var jsonBytesAttack0, jsonBytesAttack1, jsonBytesAttack2, jsonBytesAttack3: Array[Byte]           = _
+  var decoded: DistanceMatrix                                                                       = _
 
   @Setup
   def setup(): Unit = {
     //Distance Matrix API call for top-10 by population cities in US:
     //https://maps.googleapis.com/maps/api/distancematrix/json?origins=New+York|Los+Angeles|Chicago|Houston|Phoenix+AZ|Philadelphia|San+Antonio|San+Diego|Dallas|San+Jose&destinations=New+York|Los+Angeles|Chicago|Houston|Phoenix+AZ|Philadelphia|San+Antonio|San+Diego|Dallas|San+Jose
     jsonString = getResourceAsString("google_maps_api_response.json")
-    jsonChars = asChars(jsonString)
+    jsonBytes = asBytes(jsonString)
     jsonStringCompact = getResourceAsString(
       "google_maps_api_compact_response.json"
     )
-    jsonCharsCompact = asChars(jsonStringCompact)
+    jsonBytesCompact = asBytes(jsonStringCompact)
     jsonStringErr = getResourceAsString("google_maps_api_error_response.json")
-    jsonCharsErr = asChars(jsonStringErr)
+    jsonBytesErr = asBytes(jsonStringErr)
 
     // jmh:run GoogleMaps.*ErrorParse
     jsonStringErrParse = getResourceAsString("google_maps_api_error_parse.json")
-    jsonCharsErrParse = asChars(jsonStringErr)
+    jsonBytesErrParse = asBytes(jsonStringErr)
     jsonStringErrNumber = getResourceAsString(
       "google_maps_api_error_number.json"
     )
-    jsonCharsErrNumber = asChars(jsonStringErr)
+    jsonBytesErrNumber = asBytes(jsonStringErr)
 
     jsonStringAttack0 = getResourceAsString("google_maps_api_attack0.json")
-    jsonCharsAttack0 = asChars(jsonStringAttack0)
+    jsonBytesAttack0 = asBytes(jsonStringAttack0)
     jsonStringAttack1 = getResourceAsString("google_maps_api_attack1.json")
-    jsonCharsAttack1 = asChars(jsonStringAttack1)
+    jsonBytesAttack1 = asBytes(jsonStringAttack1)
     jsonStringAttack2 = getResourceAsString("google_maps_api_attack2.json")
-    jsonCharsAttack2 = asChars(jsonStringAttack2)
+    jsonBytesAttack2 = asBytes(jsonStringAttack2)
     jsonStringAttack3 = getResourceAsString("google_maps_api_attack3.json")
-    jsonCharsAttack3 = asChars(jsonStringAttack3)
+    jsonBytesAttack3 = asBytes(jsonStringAttack3)
 
     decoded = circe.parser.decode[DistanceMatrix](jsonString).toOption.get
 
@@ -238,11 +238,11 @@ class GoogleMapsAPIBenchmarks {
 
   @Benchmark
   def decodeZioSuccess1(): Either[String, DistanceMatrix] =
-    json.parser.decode[DistanceMatrix](jsonChars)
+    json.Decoder[DistanceMatrix].decodeJson(jsonBytes)
 
   @Benchmark
   def decodeZioSuccess2(): Either[String, DistanceMatrix] =
-    json.parser.decode[DistanceMatrix](jsonCharsCompact)
+    json.Decoder[DistanceMatrix].decodeJson(jsonBytesCompact)
 
   @Benchmark
   def encodeZio(): String = {
@@ -253,31 +253,31 @@ class GoogleMapsAPIBenchmarks {
 
   // @Benchmark
   // def decodeZioError(): Either[String, DistanceMatrix] =
-  //   json.parser.decode[DistanceMatrix](jsonCharsErr)
+  //   json.Decode[DistanceMatrix].decodeJson(jsonBytesErr)
 
   @Benchmark
   def decodeZioErrorParse(): Either[String, DistanceMatrix] =
-    json.parser.decode[DistanceMatrix](jsonCharsErrParse)
+    json.Decoder[DistanceMatrix].decodeJson(jsonBytesErrParse)
 
   @Benchmark
   def decodeZioErrorNumber(): Either[String, DistanceMatrix] =
-    json.parser.decode[DistanceMatrix](jsonCharsErrNumber)
+    json.Decoder[DistanceMatrix].decodeJson(jsonBytesErrNumber)
 
   @Benchmark
   def decodeZioAttack0(): Either[String, DistanceMatrix] =
-    json.parser.decode[DistanceMatrix](jsonCharsAttack0)
+    json.Decoder[DistanceMatrix].decodeJson(jsonBytesAttack0)
 
   @Benchmark
   def decodeZioAttack1(): Either[String, DistanceMatrix] =
-    json.parser.decode[DistanceMatrix](jsonCharsAttack1)
+    json.Decoder[DistanceMatrix].decodeJson(jsonBytesAttack1)
 
   @Benchmark
   def decodeZioAttack2(): Either[String, DistanceMatrix] =
-    json.parser.decode[DistanceMatrix](jsonCharsAttack2)
+    json.Decoder[DistanceMatrix].decodeJson(jsonBytesAttack2)
 
   @Benchmark
   def decodeZioAttack3(): Either[String, DistanceMatrix] =
-    json.parser.decode[DistanceMatrix](jsonCharsAttack3)
+    json.Decoder[DistanceMatrix].decodeJson(jsonBytesAttack3)
 
 }
 

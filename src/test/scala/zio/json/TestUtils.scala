@@ -38,8 +38,7 @@ object TestUtils {
     } finally is.close()
   }
 
-  def asChars(str: String): CharSequence =
-    new internal.FastCharSequence(str.toCharArray)
+  def asBytes(str: String): Array[Byte] = str.getBytes("utf-8")
 
   def getResourceAsReader(res: String): internal.RetractReader =
     new internal.FastStringReader(getResourceAsString(res))

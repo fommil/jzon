@@ -27,8 +27,10 @@ object parser {
 
 trait Decoder[A] { self =>
   // note that the string may not be fully consumed
-  final def decodeJson(str: CharSequence): Either[String, A] =
-    try Right(unsafeDecode(Nil, new FastStringReader(str)))
+  final def decodeJson(str: CharSequence): Either[String, A] = safely(new FastStringReader(str))
+  final def decodeJson(str: Array[Byte]): Either[String, A]  = safely(new FastBytesReader(str))
+  final private[this] def safely(in: RetractReader): Either[String, A] =
+    try Right(unsafeDecode(Nil, in))
     catch {
       case Decoder.UnsafeJson(trace) => Left(JsonError.render(trace))
       case internal.UnexpectedEnd    => Left("unexpected end of input")

@@ -1,5 +1,6 @@
 package zio.json.internal
 
+import java.lang.IllegalArgumentException
 import java.util.Arrays
 import scala.annotation.switch
 import scala.util.control.NoStackTrace
@@ -47,7 +48,8 @@ object UnexpectedEnd extends Exception("if you see this a dev made a mistake") w
  */
 trait RetractReader extends OneCharReader {
 
-  /** Behaviour is undefined if called more than once without a read() */
+  /** Behaviour is undefined if called more than once without a read()
+      Behaviour is also undefined if called after reading a surrogate. */
   def retract(): Unit
 }
 
@@ -98,4 +100,108 @@ final class FastStringReader(cs: CharSequence) extends RetractReader {
   }
 }
 
-// TODO FastBytesReader
+final class FastBytesReader(utf8: Array[Byte]) extends RetractReader {
+  private[this] var i: Int = 0
+
+  // size of the last multibyte that was read
+  private[this] var last: Int = 0
+
+  // if surrogate is non-zero it holds the lower surrogate of a UTF-16 that must
+  // be returned by the next read instead of querying the array. See
+  // https://en.wikipedia.org/wiki/UTF-16
+  private[this] var lowSurrogate: Int = 0
+
+  @inline def eof(): Boolean = lowSurrogate == 0 && i >= utf8.length
+
+  @inline private[this] def readByte_(): Int = {
+    val b = utf8(i)
+    i += 1
+    b & 0xFF
+  }
+  @inline private[this] def check(): Unit =
+    if (eof()) {
+      i += 1
+      last = 1
+      throw UnexpectedEnd
+    }
+  @inline private[this] def readByte(): Int = {
+    check()
+    readByte_()
+  }
+
+  private[this] def read_(): Char = {
+    if (lowSurrogate > 0) {
+      val c = lowSurrogate.toChar
+      lowSurrogate = 0
+      return c
+    }
+    val a = readByte_()
+
+    // https://en.wikipedia.org/wiki/UTF-8
+    // 0x3F = 0011 1111
+    // 0x1F = 0001 1111
+    // 0x0F = 0000 1111
+    // 0x07 = 0000 0111
+
+    // according to the unicode standard, all the higher bytes should start with
+    // 0x10, we should really check that.
+
+    ((a >> 4): @switch) match {
+      // 0xxxxxxx
+      case 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 =>
+        last = 1
+        a.toChar
+
+      // 1100xxxx 1101xxxx
+      case 12 | 13 =>
+        val b = readByte()
+        last = 2
+
+        (((a & 0x1F) << 6) | (b & 0x3F)).toChar
+
+      // 1110xxxx
+      case 14 =>
+        val b = readByte()
+        val c = readByte()
+        last = 3
+
+        (((a & 0x0F) << 12) | ((b & 0x3F) << 6) | (c & 0x3F)).toChar
+
+      // 1111xxxx
+      case 15 =>
+        val b = readByte()
+        val c = readByte()
+        val d = readByte()
+        last = 4
+
+        val codepoint = ((a & 0x07) << 18) | ((b & 0x3F) << 12) | (c & 0x3F) << 6 | (d & 0x3F)
+        lowSurrogate = Character.lowSurrogate(codepoint)
+        Character.highSurrogate(codepoint)
+
+      case _ =>
+        throw UnexpectedEnd
+    }
+
+  }
+
+  override def read(): Int = {
+    if (eof()) {
+      // no exceptions, so faster than check()
+      i += 1
+      last = 1
+      return -1
+    }
+    read_()
+  }
+
+  override def readChar(): Char = {
+    check()
+    read_()
+  }
+
+  override def retract(): Unit = {
+    if (i <= 0) throw new IllegalStateException("if you see this a dev made a mistake")
+    lowSurrogate = 0
+    i -= last
+  }
+}

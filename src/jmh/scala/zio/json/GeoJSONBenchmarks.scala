@@ -21,18 +21,18 @@ import scala.util.Try
 @Measurement(iterations = 5, time = 1, timeUnit = TimeUnit.SECONDS)
 @Fork(value = 1)
 class GeoJSONBenchmarks {
-  var jsonString1, jsonString2, jsonStringErr: String    = _
-  var jsonChars1, jsonChars2, jsonCharsErr: CharSequence = _
-  var decoded: GeoJSON                                   = _
+  var jsonString1, jsonString2, jsonStringErr: String   = _
+  var jsonBytes1, jsonBytes2, jsonBytesErr: Array[Byte] = _
+  var decoded: GeoJSON                                  = _
 
   @Setup
   def setup(): Unit = {
     jsonString1 = getResourceAsString("che.geo.json")
-    jsonChars1 = asChars(jsonString1)
+    jsonBytes1 = asBytes(jsonString1)
     jsonString2 = getResourceAsString("che-2.geo.json")
-    jsonChars2 = asChars(jsonString2)
+    jsonBytes2 = asBytes(jsonString2)
     jsonStringErr = getResourceAsString("che-err.geo.json")
-    jsonCharsErr = asChars(jsonStringErr)
+    jsonBytesErr = asBytes(jsonStringErr)
 
     decoded = circe.parser.decode[GeoJSON](jsonString1).toOption.get
 
@@ -109,11 +109,11 @@ class GeoJSONBenchmarks {
 
   @Benchmark
   def decodeZioSuccess1(): Either[String, GeoJSON] =
-    json.parser.decode[GeoJSON](jsonChars1)
+    json.Decoder[GeoJSON].decodeJson(jsonBytes1)
 
   @Benchmark
   def decodeZioSuccess2(): Either[String, GeoJSON] =
-    json.parser.decode[GeoJSON](jsonChars2)
+    json.Decoder[GeoJSON].decodeJson(jsonBytes2)
 
   @Benchmark
   def encodeZio(): String = {
@@ -124,7 +124,7 @@ class GeoJSONBenchmarks {
 
   @Benchmark
   def decodeZioError(): Either[String, GeoJSON] =
-    json.parser.decode[GeoJSON](jsonCharsErr)
+    json.Decoder[GeoJSON].decodeJson(jsonBytesErr)
 
 }
 

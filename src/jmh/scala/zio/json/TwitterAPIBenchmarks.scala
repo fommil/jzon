@@ -22,18 +22,18 @@ import scala.util.Try
 @Measurement(iterations = 5, time = 1, timeUnit = TimeUnit.SECONDS)
 @Fork(value = 1)
 class TwitterAPIBenchmarks {
-  var jsonString, jsonStringCompact, jsonStringErr: String    = _
-  var jsonChars, jsonCharsCompact, jsonCharsErr: CharSequence = _
-  var decoded: List[Tweet]                                    = _
+  var jsonString, jsonStringCompact, jsonStringErr: String   = _
+  var jsonBytes, jsonBytesCompact, jsonBytesErr: Array[Byte] = _
+  var decoded: List[Tweet]                                   = _
 
   @Setup
   def setup(): Unit = {
     jsonString = getResourceAsString("twitter_api_response.json")
-    jsonChars = asChars(jsonString)
+    jsonBytes = asBytes(jsonString)
     jsonStringCompact = getResourceAsString("twitter_api_compact_response.json")
-    jsonCharsCompact = asChars(jsonStringCompact)
+    jsonBytesCompact = asBytes(jsonStringCompact)
     jsonStringErr = getResourceAsString("twitter_api_error_response.json")
-    jsonCharsErr = asChars(jsonStringErr)
+    jsonBytesErr = asBytes(jsonStringErr)
 
     decoded = circe.parser.decode[List[Tweet]](jsonString).toOption.get
 
@@ -107,11 +107,11 @@ class TwitterAPIBenchmarks {
 
   @Benchmark
   def decodeZioSuccess1(): Either[String, List[Tweet]] =
-    json.parser.decode[List[Tweet]](jsonChars)
+    json.Decoder[List[Tweet]].decodeJson(jsonBytes)
 
   @Benchmark
   def decodeZioSuccess2(): Either[String, List[Tweet]] =
-    json.parser.decode[List[Tweet]](jsonCharsCompact)
+    json.Decoder[List[Tweet]].decodeJson(jsonBytesCompact)
 
   @Benchmark
   def encodeZio(): String = {
@@ -122,7 +122,7 @@ class TwitterAPIBenchmarks {
 
   @Benchmark
   def decodeZioError(): Either[String, List[Tweet]] =
-    json.parser.decode[List[Tweet]](jsonCharsErr)
+    json.Decoder[List[Tweet]].decodeJson(jsonBytesErr)
 
 }
 

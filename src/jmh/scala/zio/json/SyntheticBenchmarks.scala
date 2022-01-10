@@ -40,10 +40,10 @@ object Nested {
 @Fork(value = 1)
 class SyntheticBenchmarks {
   //@Param(Array("100", "1000"))
-  var size: Int               = 500
-  var jsonString: String      = _
-  var jsonChars: CharSequence = _
-  var decoded: Nested         = _
+  var size: Int              = 500
+  var jsonString: String     = _
+  var jsonBytes: Array[Byte] = _
+  var decoded: Nested        = _
 
   @Setup
   def setup(): Unit = {
@@ -54,7 +54,7 @@ class SyntheticBenchmarks {
 
       obj.asJson.noSpaces
     }
-    jsonChars = asChars(jsonString)
+    jsonBytes = asBytes(jsonString)
 
     decoded = circe.parser.decode[Nested](jsonString).toOption.get
 
@@ -92,7 +92,7 @@ class SyntheticBenchmarks {
 
   @Benchmark
   def decodeZioSuccess(): Either[String, Nested] =
-    json.parser.decode[Nested](jsonChars)
+    json.Decoder[Nested].decodeJson(jsonBytes)
 
   @Benchmark
   def encodeZio(): String = {
