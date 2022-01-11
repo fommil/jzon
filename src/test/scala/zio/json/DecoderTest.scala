@@ -19,40 +19,52 @@ object DecoderTest extends TestSuite {
 
   object exampleproducts {
     case class Parameterless()
-    object Parameterless {
-      implicit val decoder: json.Decoder[Parameterless] =
-        json.MagnoliaDecoder.gen
-    }
-
     @json.no_extra_fields
     case class OnlyString(s: String)
+
+    object Parameterless {
+      implicit val decoder: json.Decoder[Parameterless] = json.Decoder.derived
+    }
     object OnlyString {
-      implicit val decoder: json.Decoder[OnlyString] =
-        json.MagnoliaDecoder.gen
+      implicit val decoder: json.Decoder[OnlyString] = json.Decoder.derived
     }
   }
 
   object examplesum {
 
     sealed abstract class Parent
-    object Parent {
-      implicit val decoder: json.Decoder[Parent] = json.MagnoliaDecoder.gen
-    }
     case class Child1() extends Parent
     case class Child2() extends Parent
+
+    object Parent {
+      implicit val decoder: json.Decoder[Parent] = json.Decoder.derived
+    }
+    object Child1 {
+      implicit val decoder: json.Decoder[Child1] = json.Decoder.derived
+    }
+    object Child2 {
+      implicit val decoder: json.Decoder[Child2] = json.Decoder.derived
+    }
   }
 
   object examplealtsum {
 
     @json.discriminator("hint")
     sealed abstract class Parent
-    object Parent {
-      implicit val decoder: json.Decoder[Parent] = json.MagnoliaDecoder.gen
-    }
     @json.hint("Cain")
     case class Child1() extends Parent
     @json.hint("Abel")
     case class Child2() extends Parent
+
+    object Parent {
+      implicit val decoder: json.Decoder[Parent] = json.Decoder.derived
+    }
+    object Child1 {
+      implicit val decoder: json.Decoder[Child1] = json.Decoder.derived
+    }
+    object Child2 {
+      implicit val decoder: json.Decoder[Child2] = json.Decoder.derived
+    }
   }
 
   val tests = Tests {
@@ -303,10 +315,9 @@ object DecoderTest extends TestSuite {
     ast match {
       case JsObject(values) =>
         JsObject(
-          values
-            .distinctBy(_._1)
-            .map { case (k, v) => (k, normalize(v)) }
+          values.map { case (k, v) => (k, normalize(v)) }
             .sortBy(_._1)
+            .distinct
         )
       case JsArray(values) => JsArray(values.map(normalize(_)))
       case other           => other

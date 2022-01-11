@@ -5,7 +5,7 @@ import scala.collection.mutable
 import scala.collection.immutable
 import scala.util.control.NoStackTrace
 import zio.json.internal._
-import Decoder.JsonError
+import Decoder.{ JsonError, UnsafeJson }
 
 // convenience to match the circe api
 object parser {
@@ -32,8 +32,8 @@ trait Decoder[A] { self =>
   final private[this] def safely(in: RetractReader): Either[String, A] =
     try Right(unsafeDecode(Nil, in))
     catch {
-      case Decoder.UnsafeJson(trace) => Left(JsonError.render(trace))
-      case internal.UnexpectedEnd    => Left("unexpected end of input")
+      case UnsafeJson(trace) => Left(JsonError.render(trace))
+      case UnexpectedEnd     => Left("unexpected end of input")
     }
 
   // scalaz-deriving style MonadError combinators
@@ -51,13 +51,13 @@ trait Decoder[A] { self =>
       override def unsafeDecodeMissing(trace: List[JsonError]): B =
         f(self.unsafeDecodeMissing(trace)) match {
           case Left(err) =>
-            throw Decoder.UnsafeJson(JsonError.Message(err) :: trace)
+            throw UnsafeJson(JsonError.Message(err) :: trace)
           case Right(b) => b
         }
       def unsafeDecode(trace: List[JsonError], in: RetractReader): B =
         f(self.unsafeDecode(trace, in)) match {
           case Left(err) =>
-            throw Decoder.UnsafeJson(JsonError.Message(err) :: trace)
+            throw UnsafeJson(JsonError.Message(err) :: trace)
           case Right(b) => b
         }
     }
@@ -70,13 +70,15 @@ trait Decoder[A] { self =>
   // We could use a ReaderT[List[JsonError]] but that would bring in
   // dependencies and overhead, so we pass the trace context manually.
   def unsafeDecodeMissing(trace: List[JsonError]): A =
-    throw Decoder.UnsafeJson(JsonError.Message("missing") :: trace)
+    throw UnsafeJson(JsonError.Message("missing") :: trace)
 
   def unsafeDecode(trace: List[JsonError], in: RetractReader): A
 }
 
-object Decoder extends GeneratedTupleDecoders with DecoderLowPriority1 {
+object Decoder extends DecoderGenerated with DecoderLowPriority1 {
   def apply[A](implicit a: Decoder[A]): Decoder[A] = a
+
+  def derived[A, B](implicit S: shapely.Shapely[A, B], B: Decoder[B]): Decoder[A] = B.map(S.from)
 
   // Design note: we could require the position in the stream here to improve
   // debugging messages. But the cost would be that the RetractReader would need
@@ -317,7 +319,7 @@ trait FieldDecoder[A] { self =>
       def unsafeDecodeField(trace: List[JsonError], in: String): B =
         f(self.unsafeDecodeField(trace, in)) match {
           case Left(err) =>
-            throw Decoder.UnsafeJson(JsonError.Message(err) :: trace)
+            throw UnsafeJson(JsonError.Message(err) :: trace)
           case Right(b) => b
         }
     }
@@ -327,5 +329,143 @@ trait FieldDecoder[A] { self =>
 object FieldDecoder {
   implicit val string: FieldDecoder[String] = new FieldDecoder[String] {
     def unsafeDecodeField(trace: List[JsonError], in: String): String = in
+  }
+}
+
+// Common code that is mixed into all the generated CaseClass decoders.
+//
+// Ostensibly, we could add a fully typesafe version of this code to every
+// decoder, but it would be less efficient because we would have to store values
+// as Option since we cannot null them out. But by erasing everything into an
+// Array[Any] we get around that and avoid the object allocation.
+private[json] abstract class CaseClassDecoder[A, CC <: shapely.CaseClass[A]](M: shapely.Meta[A]) extends Decoder[CC] {
+  val no_extra = M.annotations.collectFirst { case _: no_extra_fields => () }.isDefined
+
+  val names: Array[String] = M.fieldAnnotations
+    .zip(M.fieldNames)
+    .map {
+      case (a, n) => a.collectFirst { case field(name) => name }.getOrElse(n)
+    }
+    .toArray
+
+  val matrix: StringMatrix    = new StringMatrix(names)
+  val spans: Array[JsonError] = names.map(JsonError.ObjectAccess(_))
+
+  def tcs: Array[Decoder[Any]]
+  def cons(ps: Array[Any]): CC
+
+  final override def unsafeDecode(trace: List[JsonError], in: RetractReader): CC = {
+    Lexer.char(trace, in, '{')
+
+    val ps: Array[Any] = Array.ofDim(names.length)
+    if (Lexer.firstObject(trace, in))
+      do {
+        var trace_ = trace
+        val field  = Lexer.field(trace, in, matrix)
+        if (field != -1) {
+          val field_ = names(field)
+          trace_ = spans(field) :: trace
+          if (ps(field) != null)
+            throw UnsafeJson(JsonError.Message("duplicate") :: trace_)
+          ps(field) = tcs(field).unsafeDecode(trace_, in)
+        } else if (no_extra) {
+          throw UnsafeJson(
+            JsonError.Message(s"invalid extra field") :: trace
+          )
+        } else
+          Lexer.skipValue(trace_, in, null)
+      } while (Lexer.nextObject(trace, in))
+
+    var i = 0
+    while (i < names.length) {
+      if (ps(i) == null)
+        ps(i) = tcs(i).unsafeDecodeMissing(spans(i) :: trace)
+      i += 1
+    }
+
+    cons(ps)
+  }
+}
+
+private[json] abstract class SealedTraitDecoder[A, ST <: shapely.SealedTrait[A]](subs: Array[shapely.Meta[_]])
+    extends Decoder[ST] {
+  val names: Array[String]    = subs.map(m => m.annotations.collectFirst { case hint(name) => name }.getOrElse(m.name))
+  val matrix: StringMatrix    = new StringMatrix(names)
+  val spans: Array[JsonError] = names.map(JsonError.ObjectAccess(_))
+
+  def tcs: Array[Decoder[ST]]
+
+  // not allowing extra fields in this encoding
+  def unsafeDecode(trace: List[JsonError], in: RetractReader): ST = {
+    Lexer.char(trace, in, '{')
+    if (Lexer.firstObject(trace, in)) {
+      val field = Lexer.field(trace, in, matrix)
+      if (field != -1) {
+        val field_ = names(field)
+        val trace_ = spans(field) :: trace
+        val a      = tcs(field).unsafeDecode(trace_, in)
+        Lexer.char(trace, in, '}')
+        return a
+      } else
+        throw UnsafeJson(JsonError.Message("invalid disambiguator") :: trace)
+    } else
+      throw UnsafeJson(JsonError.Message("expected non-empty object") :: trace)
+  }
+}
+
+private[json] abstract class SealedTraitDiscrimDecoder[A, ST <: shapely.SealedTrait[A]](
+  subs: Array[shapely.Meta[_]],
+  hintfield: String
+) extends Decoder[ST] {
+  val names: Array[String] = subs.map(m => m.annotations.collectFirst { case hint(name) => name }.getOrElse(m.name))
+  val matrix: StringMatrix = new StringMatrix(names)
+
+  def tcs: Array[Decoder[ST]]
+
+  def unsafeDecode(trace: List[JsonError], in: RetractReader): ST = {
+    var fields: List[(CharSequence, CharSequence)] = Nil
+    var hint: Int                                  = -1
+
+    Lexer.char(trace, in, '{')
+    if (Lexer.firstObject(trace, in))
+      do {
+        // materialise the string since we don't know what it can be
+        val field = Lexer.string(trace, in)
+        Lexer.char(trace, in, ':')
+
+        // an additional performance / security improvement that could be made
+        // here would be to assume that the case classes are all derived (which
+        // could be checked by testing the type) and then use the subs to find
+        // which field names are valid to retain.
+        if (hintfield.contentEquals(field)) {
+          if (hint != -1)
+            throw UnsafeJson(JsonError.Message(s"duplicate disambiguator '$hintfield'") :: trace)
+          hint = Lexer.ordinal(trace, in, matrix)
+          if (hint == -1)
+            throw UnsafeJson(JsonError.Message(s"invalid disambiguator in '$hintfield'") :: trace)
+        } else {
+          val out = new FastStringWriter(1024)
+          Lexer.skipValue(trace, in, out)
+          fields ::= (field -> out.buffer) // duplicates will be caught later
+        }
+      } while (Lexer.nextObject(trace, in))
+
+    if (hint == -1)
+      throw UnsafeJson(JsonError.Message(s"missing disambiguator '$hintfield'") :: trace)
+
+    val reconstructed = new FastStringWriter(1024)
+    reconstructed.append("{")
+    var first = true
+    fields.foreach {
+      case (name, value) =>
+        if (first) first = false
+        else reconstructed.append(',')
+        Encoder.charseq.unsafeEncode(name, None, reconstructed)
+        reconstructed.append(':')
+        reconstructed.append(value)
+    }
+    reconstructed.append("}")
+
+    tcs(hint).unsafeDecode(trace, new FastStringReader(reconstructed.buffer))
   }
 }

@@ -4,6 +4,8 @@ import scala.annotation._
 import scala.collection.mutable
 import scala.collection.immutable
 
+import zio.json.internal._
+
 // convenient `.toJson` syntax
 object syntax {
   implicit final class EncoderOps[A](private val a: A) extends AnyVal {
@@ -16,7 +18,7 @@ object syntax {
 
 trait Encoder[A] { self =>
   def toJson(a: A, indent: Option[Int]): String = {
-    val writer = new internal.FastStringWriter(64)
+    val writer = new FastStringWriter(64)
     unsafeEncode(a, indent, writer)
     writer.toString
   }
@@ -36,8 +38,10 @@ trait Encoder[A] { self =>
   def isNothing(a: A): Boolean = false
 }
 
-object Encoder extends GeneratedTupleEncoders with EncoderLowPriority1 {
+object Encoder extends EncoderGenerated with EncoderLowPriority1 {
   def apply[A](implicit a: Encoder[A]): Encoder[A] = a
+
+  def derived[A, B](implicit S: shapely.Shapely[A, B], B: Encoder[B]): Encoder[A] = B.contramap(S.to)
 
   implicit val charseq: Encoder[CharSequence] = new Encoder[CharSequence] {
     override def unsafeEncode(a: CharSequence, indent: Option[Int], out: java.io.Writer): Unit = {
@@ -206,4 +210,114 @@ object FieldEncoder {
   implicit val string: FieldEncoder[String] = new FieldEncoder[String] {
     def unsafeEncodeField(in: String): String = in
   }
+}
+
+// Common code that is mixed into all the generated CaseClass encoders.
+private[json] abstract class CaseClassEncoder[A, CC <: shapely.CaseClass[A]](M: shapely.Meta[A]) extends Encoder[CC] {
+  val names: Array[String] = M.fieldAnnotations
+    .zip(M.fieldNames)
+    .map {
+      case (a, n) => a.collectFirst { case field(name) => name }.getOrElse(n)
+    }
+    .toArray
+
+  def isNothing(cc: CC, i: Int): Boolean
+  def unsafeEncode(cc: CC, indent: Option[Int], out: java.io.Writer, i: Int): Unit
+
+  final override def unsafeEncode(cc: CC, indent: Option[Int], out: java.io.Writer): Unit = {
+    var i = 0
+    out.write("{")
+    val indent_ = Encoder.bump(indent)
+    Encoder.pad(indent_, out)
+
+    while (i < names.length) {
+      if (!isNothing(cc, i)) {
+        if (i > 0) {
+          if (indent.isEmpty) out.write(",")
+          else {
+            out.write(",")
+            Encoder.pad(indent_, out)
+          }
+        }
+        Encoder.string.unsafeEncode(names(i), indent_, out)
+        if (indent.isEmpty) out.write(":")
+        else out.write(" : ")
+        unsafeEncode(cc, indent_, out, i)
+      }
+      i += 1
+    }
+    Encoder.pad(indent, out)
+    out.write("}")
+  }
+}
+
+private[json] abstract class SealedTraitEncoder[A, ST <: shapely.SealedTrait[A]](subs: Array[shapely.Meta[_]])
+    extends Encoder[ST] {
+  val names: Array[String] = subs.map(m => m.annotations.collectFirst { case hint(name) => name }.getOrElse(m.name))
+  val matrix: StringMatrix = new StringMatrix(names)
+
+  def unsafeEncodeValue(st: ST, indent: Option[Int], out: java.io.Writer): Unit
+
+  final override def unsafeEncode(st: ST, indent: Option[Int], out: java.io.Writer): Unit = {
+    out.write("{")
+    val indent_ = Encoder.bump(indent)
+    Encoder.pad(indent_, out)
+    Encoder.string.unsafeEncode(names(st.index), indent_, out)
+    if (indent.isEmpty) out.write(":")
+    else out.write(" : ")
+    unsafeEncodeValue(st, indent_, out)
+    Encoder.pad(indent, out)
+    out.write("}")
+  }
+}
+
+private[json] abstract class SealedTraitDiscrimEncoder[A, ST <: shapely.SealedTrait[A]](
+  subs: Array[shapely.Meta[_]],
+  hintfield: String
+) extends Encoder[ST] {
+  val names: Array[String] = subs.map(m => m.annotations.collectFirst { case hint(name) => name }.getOrElse(m.name))
+  val matrix: StringMatrix = new StringMatrix(names)
+
+  def unsafeEncodeValue(st: ST, indent: Option[Int], out: java.io.Writer): Unit
+
+  final override def unsafeEncode(st: ST, indent: Option[Int], out: java.io.Writer): Unit = {
+    out.write("{")
+    val indent_ = Encoder.bump(indent)
+    Encoder.pad(indent_, out)
+    Encoder.string.unsafeEncode(hintfield, indent_, out)
+    if (indent.isEmpty) out.write(":")
+    else out.write(" : ")
+    Encoder.string.unsafeEncode(names(st.index), indent_, out)
+
+    // whitespace is always off by 2 spaces at the end, probably not worth fixing
+    val intermediate = new NestedWriter(out, indent_)
+    unsafeEncodeValue(st, indent, intermediate)
+  }
+
+}
+
+// intercepts the first `{` of a nested writer and discards it. We also need to
+// inject a `,` unless an empty object `{}` has been written.
+private final class NestedWriter(out: java.io.Writer, indent: Option[Int]) extends java.io.Writer {
+  def close(): Unit               = out.close()
+  def flush(): Unit               = out.flush()
+  private[this] var first, second = true
+  def write(cs: Array[Char], from: Int, len: Int): Unit =
+    if (first || second) {
+      var i = 0
+      while (i < len) {
+        val c = cs(from + i)
+        if (c == ' ' || c == '\n') {} else if (first && c == '{') {
+          first = false
+        } else if (second) {
+          second = false
+          if (c != '}') {
+            out.append(",")
+            Encoder.pad(indent, out)
+          }
+          return out.write(cs, from + i, len - i)
+        }
+        i += 1
+      }
+    } else out.write(cs, from, len)
 }

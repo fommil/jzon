@@ -21,43 +21,57 @@ object EncoderTest extends TestSuite {
     case class Parameterless()
     object Parameterless {
       implicit val encoder: json.Encoder[Parameterless] =
-        json.MagnoliaEncoder.gen
+        json.Encoder.derived
     }
 
     case class OnlyString(s: String)
     object OnlyString {
       implicit val encoder: json.Encoder[OnlyString] =
-        json.MagnoliaEncoder.gen
+        json.Encoder.derived
     }
 
     case class CoupleOfThings(@json.field("j") i: Int, f: Option[Float], b: Boolean)
     object CoupleOfThings {
       implicit val encoder: json.Encoder[CoupleOfThings] =
-        json.MagnoliaEncoder.gen
+        json.Encoder.derived
     }
   }
 
   object examplesum {
 
     sealed abstract class Parent
-    object Parent {
-      implicit val encoder: json.Encoder[Parent] = json.MagnoliaEncoder.gen
-    }
     case class Child1() extends Parent
     @json.hint("Cain")
     case class Child2() extends Parent
+
+    object Parent {
+      implicit val encoder: json.Encoder[Parent] = json.Encoder.derived
+    }
+    object Child1 {
+      implicit val encoder: json.Encoder[Child1] = json.Encoder.derived
+    }
+    object Child2 {
+      implicit val encoder: json.Encoder[Child2] = json.Encoder.derived
+    }
   }
 
   object examplealtsum {
 
     @json.discriminator("hint")
     sealed abstract class Parent
-    object Parent {
-      implicit val encoder: json.Encoder[Parent] = json.MagnoliaEncoder.gen
-    }
     case class Child1() extends Parent
     @json.hint("Abel")
     case class Child2(s: Option[String]) extends Parent
+
+    object Parent {
+      implicit val encoder: json.Encoder[Parent] = json.Encoder.derived
+    }
+    object Child1 {
+      implicit val encoder: json.Encoder[Child1] = json.Encoder.derived
+    }
+    object Child2 {
+      implicit val encoder: json.Encoder[Child2] = json.Encoder.derived
+    }
   }
 
   val tests = Tests {

@@ -27,8 +27,8 @@ object RoundtripTest extends Scalaprops {
   val bigints = property { i: java.math.BigInteger => implies(i.bitLength < 128, roundtrip(i)) }
 
   // NaN / Infinity is tested manually, because of == semantics
-  val floats  = property { i: Float => implies(i.isFinite, roundtrip(i)) }
-  val doubles = property { i: Double => implies(i.isFinite, roundtrip(i)) }
+  val floats  = property { i: Float => implies(java.lang.Float.isFinite(i), roundtrip(i)) }
+  val doubles = property { i: Double => implies(java.lang.Double.isFinite(i), roundtrip(i)) }
 
   val asts = property { i: JsValue => roundtrip(i) }
 

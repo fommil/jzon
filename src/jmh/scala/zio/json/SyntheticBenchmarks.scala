@@ -16,10 +16,10 @@ import scala.util.Try
 
 final case class Nested(n: Option[Nested])
 object Nested {
-  implicit lazy val zioJsonDecoder: json.Decoder[Nested] =
-    json.MagnoliaDecoder.gen
-  implicit lazy val zioJsonEncoder: json.Encoder[Nested] =
-    json.MagnoliaEncoder.gen
+  implicit val zioJsonDecoder: json.Decoder[Nested] =
+    json.Decoder.derived
+  implicit val zioJsonEncoder: json.Encoder[Nested] =
+    json.Encoder.derived
 
   implicit val customConfig: circe.generic.extras.Configuration =
     circe.generic.extras.Configuration.default

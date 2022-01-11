@@ -31,8 +31,8 @@ import scala.util.Try
 //
 // Also try the async profiler, e.g.
 //
-//  jmh:run -i 1 -wi 0 -r60 -prof jmh.extras.Async GoogleMaps.*encodeMagnolia
-//  jmh:run -i 1 -wi 0 -r60 -prof jmh.extras.Async:event=alloc GoogleMaps.*encodeMagnolia
+//  jmh:run -i 1 -wi 0 -r60 -prof jmh.extras.Async GoogleMaps.*encodeZioJson
+//  jmh:run -i 1 -wi 0 -r60 -prof jmh.extras.Async:event=alloc GoogleMaps.*encodeZioJson
 //
 // which may require kernel permissions:
 //

@@ -30,11 +30,46 @@ package generated {
     features: List[GeoJSON] // NOTE: recursive
   ) extends GeoJSON
 
+  object Point {
+    implicit val decoder: json.Decoder[Point] = json.Decoder.derived
+    implicit val encoder: json.Encoder[Point] = json.Encoder.derived
+  }
+  object MultiPoint {
+    implicit val decoder: json.Decoder[MultiPoint] = json.Decoder.derived
+    implicit val encoder: json.Encoder[MultiPoint] = json.Encoder.derived
+  }
+  object LineString {
+    implicit val decoder: json.Decoder[LineString] = json.Decoder.derived
+    implicit val encoder: json.Encoder[LineString] = json.Encoder.derived
+  }
+  object MultiLineString {
+    implicit val decoder: json.Decoder[MultiLineString] = json.Decoder.derived
+    implicit val encoder: json.Encoder[MultiLineString] = json.Encoder.derived
+  }
+  object Polygon {
+    implicit val decoder: json.Decoder[Polygon] = json.Decoder.derived
+    implicit val encoder: json.Encoder[Polygon] = json.Encoder.derived
+  }
+  object MultiPolygon {
+    implicit val decoder: json.Decoder[MultiPolygon] = json.Decoder.derived
+    implicit val encoder: json.Encoder[MultiPolygon] = json.Encoder.derived
+  }
+  object GeometryCollection {
+    implicit val decoder: json.Decoder[GeometryCollection] = json.Decoder.derived
+    implicit val encoder: json.Encoder[GeometryCollection] = json.Encoder.derived
+  }
+  object Feature {
+    implicit val decoder: json.Decoder[Feature] = json.Decoder.derived
+    implicit val encoder: json.Encoder[Feature] = json.Encoder.derived
+  }
+  object FeatureCollection {
+    implicit val decoder: json.Decoder[FeatureCollection] = json.Decoder.derived
+    implicit val encoder: json.Encoder[FeatureCollection] = json.Encoder.derived
+  }
+
   object Geometry {
-    implicit lazy val zioJsonDecoder: json.Decoder[Geometry] =
-      json.MagnoliaDecoder.gen
-    implicit lazy val zioJsonEncoder: json.Encoder[Geometry] =
-      json.MagnoliaEncoder.gen
+    implicit val zioJsonDecoder: json.Decoder[Geometry]      = json.Decoder.derived
+    implicit lazy val zioJsonEncoder: json.Encoder[Geometry] = json.Encoder.derived
 
     implicit val customConfig: circe.generic.extras.Configuration =
       circe.generic.extras.Configuration.default
@@ -56,10 +91,8 @@ package generated {
 
   }
   object GeoJSON {
-    implicit lazy val zioJsonDecoder: json.Decoder[GeoJSON] =
-      json.MagnoliaDecoder.gen
-    implicit lazy val zioJsonEncoder: json.Encoder[GeoJSON] =
-      json.MagnoliaEncoder.gen
+    implicit val zioJsonDecoder: json.Decoder[GeoJSON]      = json.Decoder.derived
+    implicit lazy val zioJsonEncoder: json.Encoder[GeoJSON] = json.Encoder.derived
 
     implicit val customConfig: circe.generic.extras.Configuration =
       circe.generic.extras.Configuration.default
@@ -93,6 +126,34 @@ package handrolled {
   final case class FeatureCollection(
     features: List[GeoJSON] // NOTE: recursive
   ) extends GeoJSON
+
+  object Point {
+    implicit val encoder: json.Encoder[Point] = json.Encoder.derived
+  }
+  object MultiPoint {
+    implicit val encoder: json.Encoder[MultiPoint] = json.Encoder.derived
+  }
+  object LineString {
+    implicit val encoder: json.Encoder[LineString] = json.Encoder.derived
+  }
+  object MultiLineString {
+    implicit val encoder: json.Encoder[MultiLineString] = json.Encoder.derived
+  }
+  object Polygon {
+    implicit val encoder: json.Encoder[Polygon] = json.Encoder.derived
+  }
+  object MultiPolygon {
+    implicit val encoder: json.Encoder[MultiPolygon] = json.Encoder.derived
+  }
+  object GeometryCollection {
+    implicit val encoder: json.Encoder[GeometryCollection] = json.Encoder.derived
+  }
+  object Feature {
+    implicit val encoder: json.Encoder[Feature] = json.Encoder.derived
+  }
+  object FeatureCollection {
+    implicit val encoder: json.Encoder[FeatureCollection] = json.Encoder.derived
+  }
 
   object Geometry {
     // this is an example of a handrolled decoder that avoids using the
@@ -228,8 +289,7 @@ package handrolled {
         }
 
       }
-    implicit lazy val zioJsonEncoder: json.Encoder[Geometry] =
-      json.MagnoliaEncoder.gen
+    implicit lazy val zioJsonEncoder: json.Encoder[Geometry] = json.Encoder.derived
 
     implicit val customConfig: circe.generic.extras.Configuration =
       circe.generic.extras.Configuration.default
@@ -338,8 +398,7 @@ package handrolled {
         }
 
       }
-    implicit lazy val zioJsonEncoder: json.Encoder[GeoJSON] =
-      json.MagnoliaEncoder.gen
+    implicit lazy val zioJsonEncoder: json.Encoder[GeoJSON] = json.Encoder.derived
 
     implicit val customConfig: circe.generic.extras.Configuration =
       circe.generic.extras.Configuration.default

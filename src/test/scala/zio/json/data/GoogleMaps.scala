@@ -23,8 +23,8 @@ final case class DistanceMatrix(
 )
 
 object Value {
-  implicit val zioJsonDecoder: json.Decoder[Value] = json.MagnoliaDecoder.gen
-  implicit val zioJsonEncoder: json.Encoder[Value] = json.MagnoliaEncoder.gen
+  implicit val zioJsonDecoder: json.Decoder[Value] = json.Decoder.derived
+  implicit val zioJsonEncoder: json.Encoder[Value] = json.Encoder.derived
 
   implicit val customConfig: circe.generic.extras.Configuration =
     circe.generic.extras.Configuration.default
@@ -55,8 +55,8 @@ object Value {
 
 }
 object Elements {
-  implicit val zioJsonDecoder: json.Decoder[Elements] = json.MagnoliaDecoder.gen
-  implicit val zioJsonEncoder: json.Encoder[Elements] = json.MagnoliaEncoder.gen
+  implicit val zioJsonDecoder: json.Decoder[Elements] = json.Decoder.derived
+  implicit val zioJsonEncoder: json.Encoder[Elements] = json.Encoder.derived
 
   implicit val customConfig: circe.generic.extras.Configuration =
     circe.generic.extras.Configuration.default
@@ -70,8 +70,8 @@ object Elements {
 
 }
 object Rows {
-  implicit val zioJsonDecoder: json.Decoder[Rows] = json.MagnoliaDecoder.gen
-  implicit val zioJsonEncoder: json.Encoder[Rows] = json.MagnoliaEncoder.gen
+  implicit val zioJsonDecoder: json.Decoder[Rows] = json.Decoder.derived
+  implicit val zioJsonEncoder: json.Encoder[Rows] = json.Encoder.derived
 
   implicit val customConfig: circe.generic.extras.Configuration =
     circe.generic.extras.Configuration.default
@@ -85,10 +85,8 @@ object Rows {
 
 }
 object DistanceMatrix {
-  implicit val zioJsonDecoder: json.Decoder[DistanceMatrix] =
-    json.MagnoliaDecoder.gen
-  implicit val zioJsonEncoder: json.Encoder[DistanceMatrix] =
-    json.MagnoliaEncoder.gen
+  implicit val zioJsonDecoder: json.Decoder[DistanceMatrix] = json.Decoder.derived
+  implicit val zioJsonEncoder: json.Encoder[DistanceMatrix] = json.Encoder.derived
 
   implicit val customConfig: circe.generic.extras.Configuration =
     circe.generic.extras.Configuration.default

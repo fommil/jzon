@@ -109,8 +109,7 @@ object NeoJmhPlugin extends AutoPlugin {
     NeoJmhPlugin.JmhInternal / dependencyClasspathAsJars ++= (NeoJmhKeys.Jmh / fullClasspathAsJars).value
   )
 
-  def generateBenchmarkSourcesAndResources
-    : Def.Initialize[Task[(Seq[File], Seq[File])]] = Def.task {
+  def generateBenchmarkSourcesAndResources: Def.Initialize[Task[(Seq[File], Seq[File])]] = Def.task {
     val s                = streams.value
     val cacheDir         = crossTarget.value / "jmh-cache"
     val bytecodeDir      = (Jmh / classDirectory).value

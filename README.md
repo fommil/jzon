@@ -13,7 +13,7 @@ Extreme **performance** is achieved by decoding JSON directly from the input sou
 
 Best in class **security** is achieved with an aggressive *early exit* strategy that avoids costly stacktraces, even when parsing malformed numbers. Malicious (and badly formed) payloads are rejected before finishing reading.
 
-**Fast compilation** and **future proofing** is possible thanks to [Magnolia](https://propensive.com/opensource/magnolia/) which allows us to generate boilerplate in a way that will survive the exodus to Scala 3. `zio-json` is internally implemented using a [`java.io.Reader`](https://docs.oracle.com/en/java/javase/14/docs/api/java.base/java/io/Reader.html)-like interface which is making a comeback to center stage in Loom.
+**Fast compilation** and **future proofing** is possible thanks to [Shapely](https://gitlab.com/fommil/shapely) which is source compatible with Scala 3. `zio-json` is internally implemented using a [`java.io.Reader`](https://docs.oracle.com/en/java/javase/14/docs/api/java.base/java/io/Reader.html)-like interface which is making a comeback to center stage in Loom.
 
 **Simplicity** is achieved by using well-known software patterns and avoiding bloat. The only requirement to use this library is to know about Scala's encoding of typeclasses, described in [Functional Programming for Mortals](https://leanpub.com/fpmortals/read#leanpub-auto-functionality).
 
@@ -58,7 +58,7 @@ To do this, we create an *instance* of the `json.Decoder` typeclass for `Banana`
 
 ```scala
 object Banana {
-  implicit val decoder: json.Decoder[Banana] = json.MagnoliaDecoder.gen
+  implicit val decoder: json.Decoder[Banana] = json.Decoder.derived
 }
 ```
 
@@ -74,7 +74,7 @@ Likewise, to produce JSON from our data we define a `json.Encoder`
 ```scala
 object Banana {
   ...
-  implicit val encoder: json.Encoder[Banana] = json.MagnoliaEncoder.gen
+  implicit val encoder: json.Encoder[Banana] = json.Encoder.derived
 }
 
 scala> Banana(0.5).toJson
@@ -106,8 +106,8 @@ we can generate the encoder and decoder for the entire `sealed` family
 
 ```scala
 object Fruit {
-  implicit val decoder: json.Decoder[Fruit] = json.MagnoliaDecoder.gen
-  implicit val encoder: json.Encoder[Fruit] = json.MagnoliaEncoder.gen
+  implicit val decoder: json.Decoder[Fruit] = json.Decoder.derived
+  implicit val encoder: json.Encoder[Fruit] = json.Encoder.derived
 }
 ```
 
@@ -258,7 +258,7 @@ import eu.timepit.refined.collection.NonEmpty
 case class Person(name: String Refined NonEmpty)
 
 object Person {
-  implicit val decoder: json.Decoder[Person] = json.MagnoliaDecoder.gen
+  implicit val decoder: json.Decoder[Person] = json.Decoder.derived
 }
 ```
 
