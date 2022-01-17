@@ -9,8 +9,8 @@ import com.github.plokhotnyuk.jsoniter_scala.core._
 import com.github.plokhotnyuk.jsoniter_scala.macros._
 import io.circe
 import zio.json.GoogleMapsAPIBenchmarks._
-import zio.json.TestUtils._
-import zio.json.data.googlemaps._
+import zio.json.internal.TestUtils._
+import zio.json.perfdata.googlemaps._
 import org.openjdk.jmh.annotations._
 import play.api.libs.{ json => Play }
 

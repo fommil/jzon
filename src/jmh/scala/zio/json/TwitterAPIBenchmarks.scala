@@ -7,8 +7,8 @@ import zio.json
 import com.github.plokhotnyuk.jsoniter_scala.core._
 import com.github.plokhotnyuk.jsoniter_scala.macros._
 import io.circe
-import zio.json.TestUtils._
-import zio.json.data.twitter._
+import zio.json.internal.TestUtils._
+import zio.json.perfdata.twitter._
 import org.openjdk.jmh.annotations._
 import play.api.libs.{ json => Play }
 import TwitterAPIBenchmarks._

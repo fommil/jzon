@@ -1,25 +1,25 @@
 package zio.json.compat
 
-import zio.json, json.syntax._
-import zio.json.TestUtils._
+import zio.json._
+import zio.json.internal._
+import zio.json.syntax._
 
-import utest._
 import _root_.scalaz._
 import zio.json.compat.scalaz._
 
-// testOnly *ScalazTest
-object ScalazTest extends TestSuite {
+class ScalazTest extends Test {
 
-  val tests = Tests {
-    test("IList") {
-      IList[Int]().toJson ==> "[]"
-      IList(1, 2, 3).toJson ==> "[1,2,3]"
+  def testScalaz = {
+    assertEquals("[]", IList[Int]().toJson)
+    assertEquals("[1,2,3]", IList(1, 2, 3).toJson)
 
-      IList[Int]().toJsonPretty ==> "[]"
-      IList(1, 2, 3).toJsonPretty ==> "[1, 2, 3]"
+    assertEquals("[]", IList[Int]().toJsonPretty)
+    assertEquals("[1, 2, 3]", IList(1, 2, 3).toJsonPretty)
 
-      json.parser.decode[IList[Int]]("""[1,2,3]""") ==> Right(IList(1, 2, 3))
-    }
+    assertEquals(
+      Right(IList(1, 2, 3)),
+      parser.decode[IList[Int]]("""[1,2,3]""")
+    )
   }
 
 }

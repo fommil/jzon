@@ -1,17 +1,26 @@
 package zio.json.internal
 
-import scalaprops._
-import Property.{ implies, prop, property }
+class SafeNumbersTest extends Test {
 
-// testOnly *SafeNumbersTest*
-object SafeNumbersTest extends Scalaprops {
-  implicit def shrinker[A]: Shrink[A] = Shrink.empty[A]
-
-  val validBigDecimal = property { i: java.math.BigDecimal =>
-    prop(SafeNumbers.bigdecimal(i.toString, 2048) == Some(i))
+  def testValidBigDecimal = Gen.prop(Gen.bigdecimal(2048)) { i =>
+    assertEquals(Some(i), SafeNumbers.bigdecimal(i.toString, 2048))
   }
 
-  val invalidBigDecimalEdgeCases =
+  def testValidBigDecimalEdgeCases =
+    List(
+      ".0",
+      "-.0",
+      "0",
+      "0.0",
+      "-0.0", // zeroes
+      "0000.1",
+      "0.00001",
+      "000.00001000" // various trailing zeros, should be preserved
+    ).foreach(s => assertEquals(Some(new java.math.BigDecimal(s)), SafeNumbers.bigdecimal(s, 2048)))
+
+  def testInvalidBigDecimal = Gen.prop(Gen.alpha())(s => assertEquals(None, SafeNumbers.bigdecimal(s)))
+
+  def testInvalidBigDecimalEdgeCases =
     List(
       "N",
       "Inf",
@@ -24,32 +33,13 @@ object SafeNumbersTest extends Scalaprops {
       "Infinity",
       "+Infinity",
       "-Infinity"
-    ).map(s => prop(SafeNumbers.bigdecimal(s) == None)).reduce(_ and _)
+    ).foreach(s => assertEquals(None, SafeNumbers.bigdecimal(s)))
 
-  val validBigDecimalEdgeCases =
-    List(
-      ".0",
-      "-.0",
-      "0",
-      "0.0",
-      "-0.0", // zeroes
-      "0000.1",
-      "0.00001",
-      "000.00001000" // various trailing zeros, should be preserved
-    ).map { s =>
-      (prop(
-        SafeNumbers.bigdecimal(s).toString == Some(
-          new java.math.BigDecimal(s)
-        ).toString
-      ))
-    }.reduce(_ and _)
+  def testValidBigInteger = Gen.prop(Gen.biginteger(2048)) { i =>
+    assertEquals(Some(i), SafeNumbers.biginteger(i.toString, 2048))
+  }
 
-  val invalidBigDecimalText = property { s: String => prop(SafeNumbers.bigdecimal(s) == None) }(
-    Gen.alphaLowerString,
-    Shrink.empty
-  )
-
-  val validBigIntegerEdgeCases =
+  def testValidBigIntegerEdgeCases =
     List(
       "00",
       "01",
@@ -58,48 +48,105 @@ object SafeNumbersTest extends Scalaprops {
       "9223372036854775806",
       "-9223372036854775809",
       "9223372036854775808"
-    ).map(s => prop(SafeNumbers.biginteger(s) == Some(new java.math.BigInteger(s))))
-      .reduce(_ and _)
+    ).foreach(s => assertEquals(Some(new java.math.BigInteger(s)), SafeNumbers.biginteger(s)))
 
-  val invalidBigIntegerEdgeCases =
-    prop(
-      List("0foo", "01foo", "0.1", "", "1 ")
-        .map(SafeNumbers.biginteger(_))
-        .forall(_.isEmpty)
-    )
+  def testInvalidBigInteger = Gen.prop(Gen.alpha())(s => assertEquals(None, SafeNumbers.biginteger(s)))
 
-  val validBigInteger = property { i: java.math.BigInteger =>
-    prop(SafeNumbers.biginteger(i.toString, 2048) == Some(i))
+  def testInvalidBigIntegerEdgeCases =
+    List("0foo", "01foo", "0.1", "", "1 ").foreach(s => assertEquals(None, SafeNumbers.biginteger(s)))
+
+  // byte
+  def testValidByte = Gen.prop(Gen.byte)(i => assertEquals(ByteSome(i), SafeNumbers.byte(i.toString)))
+
+  def testInvalidByte = Gen.prop(Gen.alpha())(s => assertEquals(ByteNone, SafeNumbers.byte(s)))
+
+  // short
+  def testValidShort = Gen.prop(Gen.short)(i => assertEquals(ShortSome(i), SafeNumbers.short(i.toString)))
+
+  def testInvalidShort = Gen.prop(Gen.alpha())(s => assertEquals(ShortNone, SafeNumbers.short(s)))
+
+  // int
+  def testValidInt = Gen.prop(Gen.int)(i => assertEquals(IntSome(i), SafeNumbers.int(i.toString)))
+
+  def testInvalidInt = Gen.prop(Gen.alpha())(s => assertEquals(IntNone, SafeNumbers.int(s)))
+
+  // long
+  def testValidLong = Gen.prop(Gen.long)(i => assertEquals(LongSome(i), SafeNumbers.long(i.toString)))
+
+  def testValidLongEdgeCases =
+    List("00", "01", "0000001", "-9223372036854775807", "9223372036854775806")
+      .foreach(s => assertEquals(LongSome(s.toLong), SafeNumbers.long(s)))
+
+  def testInvalidLong = Gen.prop(Gen.alpha())(s => assertEquals(LongNone, SafeNumbers.long(s)))
+
+  def testInvalidLongEdgeCases =
+    List(
+      "0foo",
+      "01foo",
+      "0.1",
+      "",
+      "1 ",
+      "-9223372036854775809",
+      "9223372036854775808"
+    ).foreach(i => assertEquals(LongNone, SafeNumbers.long(i)))
+
+  // float
+  def testValidFloat = Gen.prop(Gen.float) { i =>
+    if (java.lang.Float.isFinite(i))
+      assertEquals(FloatSome(i), SafeNumbers.float(i.toString))
   }
 
-  val invalidBigIntegerText = property { s: String => prop(SafeNumbers.biginteger(s) == None) }(
-    Gen.alphaLowerString,
-    Shrink.empty
-  )
-
-  val validByte = property { i: Byte => prop(SafeNumbers.byte(i.toString) == ByteSome(i)) }
-
-  val invalidByte = property { i: Long =>
-    implies(
-      i < Byte.MinValue || Byte.MaxValue < i,
-      prop(SafeNumbers.byte(i.toString) == ByteNone)
-    )
+  def testValidFloatFromInt = Gen.prop(Gen.int) { i =>
+    assertEquals(FloatSome(i.toFloat), SafeNumbers.float(i.toString))
   }
 
-  val invalidText = property { s: String => prop(SafeNumbers.byte(s) == ByteNone) }(Gen.alphaLowerString, Shrink.empty)
+  def testValidFloatFromDouble = Gen.prop(Gen.double) { i =>
+    if (java.lang.Double.isFinite(i))
+      assertEquals(FloatSome(i.toFloat), SafeNumbers.float(i.toString))
+  }
 
-  val validDouble = property { i: Double => implies(!i.isNaN, prop(SafeNumbers.double(i.toString) == DoubleSome(i))) }
+  def testValidFloatEdgeCases =
+    List(
+      ".0",
+      "-.0",
+      "0",
+      "0.0",
+      "-0.0", // zeroes
+      "0000.1",
+      "0.00001",
+      "000.00001000", // trailing zeros
+      "NaN",
+      "92233720368547758070", // overflows a Long significand
+      "Infinity",
+      "+Infinity",
+      "-Infinity",
+      "1.199999988079071" // large mantissa
+    ).foreach { s =>
+      // do the comparison on strings to deal with NaNs
+      assertEquals(FloatSome(s.toFloat).toString, SafeNumbers.float(s).toString)
+    }
 
-  val validDoubleFromInt = property { i: Int => prop(SafeNumbers.double(i.toString) == DoubleSome(i.toDouble)) }
+  def testInvalidFloat = Gen.prop(Gen.alpha()) { s =>
+    if (s != "NaN" && s != "Infinity")
+      assertEquals(FloatNone, SafeNumbers.float(s))
+  }
 
-  val validDoubleFromLong = property { i: Long => prop(SafeNumbers.double(i.toString) == DoubleSome(i.toDouble)) }
+  // note that in a stream, 1.1.1 may parse "1.1" leaving ".1"
+  def testInvalidFloatEdgeCases =
+    List("N", "Inf", "-NaN", "+NaN", "e1", "1.1.1")
+      .foreach(s => assertEquals(FloatNone, SafeNumbers.float(s)))
 
-  val invalidDoubleEdgeCases =
-    List("N", "Inf", "-NaN", "+NaN", "e1", "1.1.1", "1 ")
-      .map(s => prop(SafeNumbers.double(s) == DoubleNone))
-      .reduce(_ and _)
+  // double
+  def testValidDouble = Gen.prop(Gen.double) { i =>
+    if (java.lang.Double.isFinite(i))
+      assertEquals(DoubleSome(i), SafeNumbers.double(i.toString))
+  }
 
-  val validDoubleEdgeCases =
+  def testValidDoubleFromLong = Gen.prop(Gen.long) { i =>
+    assertEquals(DoubleSome(i.toDouble), SafeNumbers.double(i.toString))
+  }
+
+  def validDoubleEdgeCases =
     List(
       ".0",
       "-.0",
@@ -115,121 +162,18 @@ object SafeNumbersTest extends Scalaprops {
       "+Infinity",
       "-Infinity",
       "3.976210887433566E-281" // rounds if a naive scaling is used
-    ).map { s =>
-      // better to do the comparison on strings to deal with NaNs
-      (prop(
-        SafeNumbers.double(s).toString == DoubleSome(s.toDouble).toString
-      ))
-    }.reduce(_ and _)
+    ).foreach { s =>
+      // do the comparison on strings to deal with NaNs
+      assertEquals(DoubleSome(s.toDouble).toString, SafeNumbers.double(s).toString)
+    }
 
-  val validMagicDouble =
-    List("NaN", "Infinity", "+Infinity", "-Infinity")
-      .map(SafeNumbers.double(_))
-      .forall(!_.isEmpty)
-
-  val invalidDoubleText = property { s: String => prop(SafeNumbers.double(s) == DoubleNone) }(
-    Gen.alphaLowerString,
-    Shrink.empty
-  )
-
-  val validFloat = property { i: Float => implies(!i.isNaN, prop(SafeNumbers.float(i.toString) == FloatSome(i))) }
-
-  val validFloatFromInt = property { i: Int => prop(SafeNumbers.float(i.toString) == FloatSome(i.toFloat)) }
-
-  val validFloatFromLong = property { i: Long => prop(SafeNumbers.float(i.toString) == FloatSome(i.toFloat)) }
-
-  // note that in a stream, 1.1.1 may parse "1.1" leaving ".1"
-  val invalidFloatEdgeCases =
-    List("N", "Inf", "-NaN", "+NaN", "e1", "1.1.1")
-      .map(s => prop(SafeNumbers.float(s) == FloatNone))
-      .reduce(_ and _)
-
-  val validFloatEdgeCases =
-    List(
-      ".0",
-      "-.0",
-      "0",
-      "0.0",
-      "-0.0", // zeroes
-      "0000.1",
-      "0.00001",
-      "000.00001000", // trailing zeros
-      "NaN",
-      "92233720368547758070", // overflows a Long significand
-      "Infinity",
-      "+Infinity",
-      "-Infinity"
-    ).map { s =>
-      // better to do the comparison on strings to deal with NaNs
-      prop(SafeNumbers.float(s).toString == FloatSome(s.toFloat).toString)
-    }.reduce(_ and _)
-
-  val validFloatFromDouble = property { i: Double =>
-    implies(
-      !i.isNaN,
-      prop(SafeNumbers.float(i.toString) == FloatSome(i.toFloat))
-    )
+  def testInvalidDouble = Gen.prop(Gen.alpha()) { s =>
+    if (s != "NaN" && s != "Infinity")
+      assertEquals(DoubleNone, SafeNumbers.double(s))
   }
 
-  val invalidFloatText = property { s: String => prop(SafeNumbers.float(s) == FloatNone) }(
-    Gen.alphaLowerString,
-    Shrink.empty
-  )
-
-  val validInt = property { i: Int => prop(SafeNumbers.int(i.toString) == IntSome(i)) }
-
-  val invalidInt = property { i: Long =>
-    implies(
-      i < Int.MinValue || Int.MaxValue < i,
-      prop(SafeNumbers.int(i.toString) == IntNone)
-    )
-  }
-
-  val invalidIntText = property { s: String => prop(SafeNumbers.int(s) == IntNone) }(Gen.alphaLowerString, Shrink.empty)
-
-  val validLongEdgeCases =
-    List("00", "01", "0000001", "-9223372036854775807", "9223372036854775806")
-      .map(s => prop(SafeNumbers.long(s) == LongSome(s.toLong)))
-      .reduce(_ and _)
-
-  val invalidLongEdgeCases =
-    prop(
-      List(
-        "0foo",
-        "01foo",
-        "0.1",
-        "",
-        "1 ",
-        "-9223372036854775809",
-        "9223372036854775808"
-      ).map(SafeNumbers.long)
-        .forall(_.isEmpty)
-    )
-
-  val validLong = property { i: Long => prop(SafeNumbers.long(i.toString) == LongSome(i)) }
-
-  val invalidLong = property { bi: BigInt =>
-    val i = bi.underlying
-    implies(i.bitLength > 63, prop(SafeNumbers.long(i.toString) == LongNone))
-  }(Gen.genLargeBigInt, Shrink.empty)
-
-  val invalidLongText = property { s: String => prop(SafeNumbers.long(s) == LongNone) }(
-    Gen.alphaLowerString,
-    Shrink.empty
-  )
-
-  val validShort = property { i: Short => prop(SafeNumbers.short(i.toString) == ShortSome(i)) }
-
-  val invalidShort = property { i: Long =>
-    implies(
-      i < Short.MinValue || Short.MaxValue < i,
-      prop(SafeNumbers.short(i.toString) == ShortNone)
-    )
-  }
-
-  val invalidShortText = property { s: String => prop(SafeNumbers.short(s) == ShortNone) }(
-    Gen.alphaLowerString,
-    Shrink.empty
-  )
+  def testInvalidDoubleEdgeCases =
+    List("N", "Inf", "-NaN", "+NaN", "e1", "1.1.1", "1 ")
+      .foreach(s => assertEquals(DoubleNone, SafeNumbers.double(s)))
 
 }

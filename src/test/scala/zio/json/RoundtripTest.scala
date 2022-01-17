@@ -1,35 +1,67 @@
 package zio.json
 
-import zio.json
+import java.io.File
+import java.nio.file.Files
+import java.nio.file.Path
 import zio.json.syntax._
-import scalaprops._
-import Property.{ implies, prop, property }
+import zio.json.internal._
 
-import GenAst._
+class RoundtripTest extends Test {
 
-// testOnly *RoundtripTest
-object RoundtripTest extends Scalaprops {
+  def roundtrip[A: Decoder: Encoder](a: A): Unit = {
+    assertEquals(Right(a), parser.decode(a.toJson))
+    assertEquals(Right(a), parser.decode(a.toJsonPretty))
+  }
 
-  def roundtrip[A: Encoder: Decoder](a: A) =
-    prop(json.parser.decode[A](a.toJson) == Right(a)) and
-      prop(json.parser.decode[A](a.toJsonPretty) == Right(a))
+  def roundtripFile[A: Decoder: Encoder](res: String, pretty: Boolean): Unit = {
+    val input          = TestUtils.getResourceAsString(res)
+    val Right(decoded) = parser.decode[A](input)
+    val recoded        = if (pretty) decoded.toJsonPretty else decoded.toJson
+
+    // if this test fails, it's a lot easier to look at a diff
+    if (recoded.replaceAll("\\s", "") != input.replaceAll("\\s", "")) {
+      Files.writeString(Path.of(res).getFileName, recoded)
+      assert(false, res)
+    }
+  }
 
   // arbitrary strings are not guaranteed to roundtrip due to normalisation of
   // some unicode characters, but we could still test this on a subset of
   // strings if we wanted to create the Gens
 
-  val booleans = property { i: Boolean => roundtrip(i) }
+  def testBooleans    = Gen.prop(Gen.boolean)(roundtrip(_))
+  def testBytes       = Gen.prop(Gen.byte)(roundtrip(_))
+  def testShorts      = Gen.prop(Gen.short)(roundtrip(_))
+  def testInts        = Gen.prop(Gen.int)(roundtrip(_))
+  def testLongs       = Gen.prop(Gen.long)(roundtrip(_))
+  def testBigIntegers = Gen.prop(Gen.biginteger(128))(roundtrip(_))
+  def testFloats = Gen.prop(Gen.float) { i =>
+    if (java.lang.Float.isFinite(i))
+      roundtrip(i)
+  }
+  def testDoubles = Gen.prop(Gen.double) { i =>
+    if (java.lang.Double.isFinite(i))
+      roundtrip(i)
+  }
 
-  val bytes   = property { i: Byte => roundtrip(i) }
-  val shorts  = property { i: Short => roundtrip(i) }
-  val ints    = property { i: Int => roundtrip(i) }
-  val longs   = property { i: Long => roundtrip(i) }
-  val bigints = property { i: java.math.BigInteger => implies(i.bitLength < 128, roundtrip(i)) }
+  def testAsts = Gen.prop(GenAst.ast)(roundtrip(_))
 
-  // NaN / Infinity is tested manually, because of == semantics
-  val floats  = property { i: Float => implies(java.lang.Float.isFinite(i), roundtrip(i)) }
-  val doubles = property { i: Double => implies(java.lang.Double.isFinite(i), roundtrip(i)) }
+  def testGoogleMaps = {
+    import zio.json.data.googlemaps._
 
-  val asts = property { i: JsValue => roundtrip(i) }
+    roundtripFile[DistanceMatrix]("google_maps_api_response.json", pretty = true)
+  }
+
+  def testTwitter = {
+    import zio.json.data.twitter._
+
+    roundtripFile[List[Tweet]]("twitter_api_response.json", pretty = true)
+  }
+
+  def testGeoJSON = {
+    import zio.json.data.geojson._
+
+    roundtripFile[GeoJSON]("che.geo.json", pretty = false)
+  }
 
 }

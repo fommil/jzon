@@ -2,38 +2,28 @@ package zio.json
 
 import scala.collection.immutable
 
-import io.circe
-import zio.json
-import json.syntax._
-import TestUtils._
-import scalaprops._
-import Property.{ implies, prop, property }
-import scala.collection.mutable
+import zio.json.internal._
+import zio.json.syntax._
 
-import utest._
-import zio.json.data.googlemaps._
-import zio.json.data.twitter._
-
-// testOnly *EncoderTest
-object EncoderTest extends TestSuite {
+class EncoderTest extends Test {
 
   object exampleproducts {
     case class Parameterless()
     object Parameterless {
-      implicit val encoder: json.Encoder[Parameterless] =
-        json.Encoder.derived
+      implicit val encoder: Encoder[Parameterless] =
+        Encoder.derived
     }
 
     case class OnlyString(s: String)
     object OnlyString {
-      implicit val encoder: json.Encoder[OnlyString] =
-        json.Encoder.derived
+      implicit val encoder: Encoder[OnlyString] =
+        Encoder.derived
     }
 
-    case class CoupleOfThings(@json.field("j") i: Int, f: Option[Float], b: Boolean)
+    case class CoupleOfThings(@field("j") i: Int, f: Option[Float], b: Boolean)
     object CoupleOfThings {
-      implicit val encoder: json.Encoder[CoupleOfThings] =
-        json.Encoder.derived
+      implicit val encoder: Encoder[CoupleOfThings] =
+        Encoder.derived
     }
   }
 
@@ -41,178 +31,152 @@ object EncoderTest extends TestSuite {
 
     sealed abstract class Parent
     case class Child1() extends Parent
-    @json.hint("Cain")
+    @hint("Cain")
     case class Child2() extends Parent
 
     object Parent {
-      implicit val encoder: json.Encoder[Parent] = json.Encoder.derived
+      implicit val encoder: Encoder[Parent] = Encoder.derived
     }
     object Child1 {
-      implicit val encoder: json.Encoder[Child1] = json.Encoder.derived
+      implicit val encoder: Encoder[Child1] = Encoder.derived
     }
     object Child2 {
-      implicit val encoder: json.Encoder[Child2] = json.Encoder.derived
+      implicit val encoder: Encoder[Child2] = Encoder.derived
     }
   }
 
   object examplealtsum {
 
-    @json.discriminator("hint")
+    @discriminator("hint")
     sealed abstract class Parent
     case class Child1() extends Parent
-    @json.hint("Abel")
+    @hint("Abel")
     case class Child2(s: Option[String]) extends Parent
 
     object Parent {
-      implicit val encoder: json.Encoder[Parent] = json.Encoder.derived
+      implicit val encoder: Encoder[Parent] = Encoder.derived
     }
     object Child1 {
-      implicit val encoder: json.Encoder[Child1] = json.Encoder.derived
+      implicit val encoder: Encoder[Child1] = Encoder.derived
     }
     object Child2 {
-      implicit val encoder: json.Encoder[Child2] = json.Encoder.derived
+      implicit val encoder: Encoder[Child2] = Encoder.derived
     }
   }
 
-  val tests = Tests {
-    test("primitives") {
-      "hello world".toJson ==> "\"hello world\""
-      "hello\nworld".toJson ==> "\"hello\\nworld\""
-      "hello\rworld".toJson ==> "\"hello\\rworld\""
-      "hello\u0000world".toJson ==> "\"hello\\u0000world\""
+  def testPrimitives = {
+    assertEquals("\"hello world\"", "hello world".toJson)
+    assertEquals("\"hello\\nworld\"", "hello\nworld".toJson)
+    assertEquals("\"hello\\rworld\"", "hello\rworld".toJson)
+    assertEquals("\"hello\\u0000world\"", "hello\u0000world".toJson)
 
-      true.toJson ==> "true"
-      false.toJson ==> "false"
-      'c'.toJson ==> "\"c\""
-      Symbol("c").toJson ==> "\"c\""
+    assertEquals("true", true.toJson)
+    assertEquals("false", false.toJson)
+    assertEquals("\"c\"", 'c'.toJson)
+    assertEquals("\"c\"", Symbol("c").toJson)
 
-      (1: Byte).toJson ==> "1"
-      (1: Short).toJson ==> "1"
-      (1: Int).toJson ==> "1"
-      (1L).toJson ==> "1"
-      (new java.math.BigInteger("1")).toJson ==> "1"
-      (new java.math.BigInteger("170141183460469231731687303715884105728").toJson ==> "170141183460469231731687303715884105728")
+    assertEquals("1", (1: Byte).toJson)
+    assertEquals("1", (1: Short).toJson)
+    assertEquals("1", (1: Int).toJson)
+    assertEquals("1", (1L).toJson)
+    assertEquals("1", (new java.math.BigInteger("1")).toJson)
+    assertEquals(
+      "170141183460469231731687303715884105728",
+      new java.math.BigInteger("170141183460469231731687303715884105728").toJson
+    )
 
-      (1.0f).toJson ==> "1.0"
-      (1.0d).toJson ==> "1.0"
+    assertEquals("1.0", (1.0f).toJson)
+    assertEquals("1.0", (1.0d).toJson)
 
-      Float.NaN.toJson ==> "\"NaN\""
-      Float.PositiveInfinity.toJson ==> "\"Infinity\""
-      Float.NegativeInfinity.toJson ==> "\"-Infinity\""
+    assertEquals("\"NaN\"", Float.NaN.toJson)
+    assertEquals("\"Infinity\"", Float.PositiveInfinity.toJson)
+    assertEquals("\"-Infinity\"", Float.NegativeInfinity.toJson)
 
-      Double.NaN.toJson ==> "\"NaN\""
-      Double.PositiveInfinity.toJson ==> "\"Infinity\""
-      Double.NegativeInfinity.toJson ==> "\"-Infinity\""
-    }
+    assertEquals("\"NaN\"", Double.NaN.toJson)
+    assertEquals("\"Infinity\"", Double.PositiveInfinity.toJson)
+    assertEquals("\"-Infinity\"", Double.NegativeInfinity.toJson)
+  }
 
-    test("options") {
-      (None: Option[Int]).toJson ==> "null"
-      (Some(1): Option[Int]).toJson ==> "1"
-    }
+  def testOptions = {
+    assertEquals("null", (None: Option[Int]).toJson)
+    assertEquals("1", (Some(1): Option[Int]).toJson)
+  }
 
-    test("eithers") {
-      (Left(1): Either[Int, Int]).toJson ==> """{"Left":1}"""
-      (Right(1): Either[Int, Int]).toJson ==> """{"Right":1}"""
+  def testEithers = {
+    assertEquals("""{"Left":1}""", (Left(1): Either[Int, Int]).toJson)
+    assertEquals("""{"Right":1}""", (Right(1): Either[Int, Int]).toJson)
+    assertEquals("{\n  \"Left\" : 1\n}", (Left(1): Either[Int, Int]).toJsonPretty)
+    assertEquals("{\n  \"Right\" : 1\n}", (Right(1): Either[Int, Int]).toJsonPretty)
+  }
 
-      (Left(1): Either[Int, Int]).toJsonPretty ==> "{\n  \"Left\" : 1\n}"
-      (Right(1): Either[Int, Int]).toJsonPretty ==> "{\n  \"Right\" : 1\n}"
-    }
+  def testCollections = {
+    assertEquals("[]", List[Int]().toJson)
+    assertEquals("[1,2,3]", List(1, 2, 3).toJson)
+    assertEquals("[]", Vector[Int]().toJson)
+    assertEquals("[1,2,3]", Vector(1, 2, 3).toJson)
 
-    test("collections") {
-      List[Int]().toJson ==> "[]"
-      List(1, 2, 3).toJson ==> "[1,2,3]"
-      Vector[Int]().toJson ==> "[]"
-      Vector(1, 2, 3).toJson ==> "[1,2,3]"
+    assertEquals("{}", Map[String, String]().toJson)
+    assertEquals("""{"hello":"world"}""", Map("hello" -> "world").toJson)
+    assertEquals("""{"hello":"world"}""", Map("hello" -> Some("world"), "goodbye" -> None).toJson)
 
-      Map[String, String]().toJson ==> "{}"
-      Map("hello" -> "world").toJson ==> """{"hello":"world"}"""
-      Map("hello" -> Some("world"), "goodbye" -> None).toJson ==> """{"hello":"world"}"""
+    assertEquals("[]", List[Int]().toJsonPretty)
+    assertEquals("[1, 2, 3]", List(1, 2, 3).toJsonPretty)
+    assertEquals("[]", Vector[Int]().toJsonPretty)
+    assertEquals("[1, 2, 3]", Vector(1, 2, 3).toJsonPretty)
 
-      List[Int]().toJsonPretty ==> "[]"
-      List(1, 2, 3).toJsonPretty ==> "[1, 2, 3]"
-      Vector[Int]().toJsonPretty ==> "[]"
-      Vector(1, 2, 3).toJsonPretty ==> "[1, 2, 3]"
+    assertEquals("{}", Map[String, String]().toJsonPretty)
+    assertEquals("{\n  \"hello\" : \"world\"\n}", Map("hello" -> "world").toJsonPretty)
+    assertEquals("{\n  \"hello\" : \"world\"\n}", Map("hello" -> Some("world"), "goodbye" -> None).toJsonPretty)
+  }
 
-      Map[String, String]().toJsonPretty ==> "{}"
-      Map("hello" -> "world").toJsonPretty ==> "{\n  \"hello\" : \"world\"\n}"
-      Map("hello" -> Some("world"), "goodbye" -> None).toJsonPretty ==> "{\n  \"hello\" : \"world\"\n}"
-    }
+  def testParameterlessProducts = {
+    import exampleproducts._
 
-    test("parameterless products") {
-      import exampleproducts._
+    assertEquals("{}", Parameterless().toJson)
+    assertEquals("{}", Parameterless().toJsonPretty)
+  }
 
-      Parameterless().toJson ==> "{}"
+  def testTuples = {
+    assertEquals("""["hello","world"]""", ("hello", "world").toJson)
+    assertEquals("""["hello", "world"]""", ("hello", "world").toJsonPretty)
+  }
 
-      Parameterless().toJsonPretty ==> "{}"
-    }
+  def testProducts = {
+    import exampleproducts._
 
-    test("tuples") {
-      ("hello", "world").toJson ==> """["hello","world"]"""
+    assertEquals("""{"s":"foo"}""", OnlyString("foo").toJson)
+    assertEquals("""{"j":-1,"f":10.0,"b":false}""", CoupleOfThings(-1, Some(10.0f), false).toJson)
+    assertEquals("""{"j":0,"b":true}""", CoupleOfThings(0, None, true).toJson)
 
-      ("hello", "world").toJsonPretty ==> """["hello", "world"]"""
-    }
+    assertEquals("{\n  \"s\" : \"foo\"\n}", OnlyString("foo").toJsonPretty)
+    assertEquals(
+      "{\n  \"j\" : -1,\n  \"f\" : 10.0,\n  \"b\" : false\n}",
+      CoupleOfThings(-1, Some(10.0f), false).toJsonPretty
+    )
+    assertEquals("{\n  \"j\" : 0,\n  \"b\" : true\n}", CoupleOfThings(0, None, true).toJsonPretty)
+  }
 
-    test("products") {
-      import exampleproducts._
+  def testSumEncoding = {
+    import examplesum._
 
-      OnlyString("foo").toJson ==> """{"s":"foo"}"""
+    assertEquals("""{"Child1":{}}""", (Child1(): Parent).toJson)
+    assertEquals("""{"Cain":{}}""", (Child2(): Parent).toJson)
 
-      CoupleOfThings(-1, Some(10.0f), false).toJson ==> """{"j":-1,"f":10.0,"b":false}"""
-      CoupleOfThings(0, None, true).toJson ==> """{"j":0,"b":true}"""
+    assertEquals("{\n  \"Child1\" : {}\n}", (Child1(): Parent).toJsonPretty)
+    assertEquals("{\n  \"Cain\" : {}\n}", (Child2(): Parent).toJsonPretty)
+  }
 
-      OnlyString("foo").toJsonPretty ==> "{\n  \"s\" : \"foo\"\n}"
+  def testSumAlternativeEncoding = {
+    import examplealtsum._
 
-      CoupleOfThings(-1, Some(10.0f), false).toJsonPretty ==> "{\n  \"j\" : -1,\n  \"f\" : 10.0,\n  \"b\" : false\n}"
-      CoupleOfThings(0, None, true).toJsonPretty ==> "{\n  \"j\" : 0,\n  \"b\" : true\n}"
-    }
+    assertEquals("""{"hint":"Child1"}""", (Child1(): Parent).toJson)
+    assertEquals("""{"hint":"Abel"}""", (Child2(None): Parent).toJson)
+    assertEquals("""{"hint":"Abel","s":"hello"}""", (Child2(Some("hello")): Parent).toJson)
 
-    test("sum encoding") {
-      import examplesum._
-
-      (Child1(): Parent).toJson ==> """{"Child1":{}}"""
-      (Child2(): Parent).toJson ==> """{"Cain":{}}"""
-
-      (Child1(): Parent).toJsonPretty ==> "{\n  \"Child1\" : {}\n}"
-      (Child2(): Parent).toJsonPretty ==> "{\n  \"Cain\" : {}\n}"
-    }
-
-    test("sum alternative encoding") {
-      import examplealtsum._
-
-      (Child1(): Parent).toJson ==> """{"hint":"Child1"}"""
-      (Child2(None): Parent).toJson ==> """{"hint":"Abel"}"""
-      (Child2(Some("hello")): Parent).toJson ==> """{"hint":"Abel","s":"hello"}"""
-
-      // note lack of whitespace on last line
-      (Child1(): Parent).toJsonPretty ==> "{\n  \"hint\" : \"Child1\"}"
-      (Child2(None): Parent).toJsonPretty ==> "{\n  \"hint\" : \"Abel\"}"
-      (Child2(Some("hello")): Parent).toJsonPretty ==> "{\n  \"hint\" : \"Abel\",\n  \"s\" : \"hello\"\n}"
-    }
-
-    // using circe to avoid entwining this test on zio.json.Decoder
-    def testRoundtrip[A: circe.Decoder: Encoder](res: String) = {
-      val jsonString = getResourceAsString(res)
-      val decoded    = circe.parser.decode[A](jsonString)
-      val recoded    = decoded.toOption.get.toJson
-      circe.parser.decode[A](recoded) ==> decoded
-
-      val recodedPretty = decoded.toOption.get.toJson
-      circe.parser.decode[A](recodedPretty) ==> decoded
-    }
-
-    test("Google Maps") {
-      testRoundtrip[DistanceMatrix]("google_maps_api_response.json")
-    }
-
-    test("Twitter") {
-      testRoundtrip[List[Tweet]]("twitter_api_response.json")
-    }
-
-    test("GeoJSON") {
-      import zio.json.data.geojson.generated._
-
-      testRoundtrip[GeoJSON]("che.geo.json")
-    }
+    // note lack of whitespace on last line
+    assertEquals("{\n  \"hint\" : \"Child1\"}", (Child1(): Parent).toJsonPretty)
+    assertEquals("{\n  \"hint\" : \"Abel\"}", (Child2(None): Parent).toJsonPretty)
+    assertEquals("{\n  \"hint\" : \"Abel\",\n  \"s\" : \"hello\"\n}", (Child2(Some("hello")): Parent).toJsonPretty)
   }
 
 }

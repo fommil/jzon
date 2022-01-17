@@ -1,74 +1,55 @@
 package zio.json.internal
 
-import scalaprops._
-import Property.{ implies, prop, property }
-import utest._
+class FastBytesReaderTest extends Test {
 
-object FastBytesReaderProps extends Scalaprops {
-  override val param = super.param.copy(maxSize = 100000)
-
-  // samples from all valid utf-8 values, including those that are represented
-  // as multiple Chars (surrogate pairs) in Java's utf-16 encoding.
-  //
-  // https://github.com/scalaprops/scalaprops/issues/26
-  val unicodeString: Gen[String] = {
-    val chars = Gen.choose(0, 0x10FFFF).map { cp =>
-      if (Character.isBmpCodePoint(cp)) List(cp.toChar)
-      else List(Character.highSurrogate(cp), Character.lowSurrogate(cp))
-    }
-    Gen.listOf(chars).map(_.flatten.mkString)
-  }
-
-  // only covers the Basic Multilingual Plane, additional tests needed for
-  // surrogate pairs.
-  val genBmp = Gen.choose(0, 0xD7FF).map(_.toChar)
-
-  implicit val genBmpString: Gen[String] = Gen.genString(genBmp, 0)
-  implicit val strShrinker: Shrink[String] = Shrink.shrink { txt =>
-    if (txt.isEmpty) Stream.empty[String]
-    else if (txt.length == 1) Stream("")
-    else {
-      val a = if (txt.head.isSurrogate) txt.drop(2) else txt.drop(1)
-      val b = if (txt.last.isSurrogate) txt.take(txt.length - 2) else txt.take(txt.length - 1)
-      Stream(a, b).filter(_ != txt).distinct
-    }
-  }
-
-  val safe = property { (str: String, num: Int) =>
-    val retractAt = if (str.isEmpty) -1 else (num % str.length)
-    val parsed    = parse(str, retractAt)
-
-    if (parsed != str)
-      println(s"FAIL ($parsed) != ($str) | ${parsed.toList} ${str.toList}")
-
-    prop(parsed == str)
-  }
-
-  def parse(str: String, retractAt: Int): String = {
+  def assertParse(str: String, retractAt: Int): Unit = {
     val in      = new FastBytesReader(str.getBytes("utf-8"))
     val builder = new FastStringWriter(str.length)
     var i       = 0
+
+    var lowSurrogate = false
     while (i < str.length) {
-      if (i == retractAt && i > 0) {
+      if (i == retractAt && i > 0 && !lowSurrogate) {
         in.retract()
         in.readChar()
       }
-      builder.append(in.readChar())
+      val c = in.readChar()
+      lowSurrogate = Character.isLowSurrogate(c)
+      builder.append(c)
       i += 1
     }
-    builder.toString
-  }
-}
+    val parsed = builder.toString
 
-object FastBytesReaderTest extends TestSuite {
-
-  val tests = Tests {
-    // this is covered by the prop tests but is a useful standalone test
-    test("surrogate pairs") {
-      // 0x10348 into 0xd800, 0xdf48
-      val str = "wibble wobble I'm a %c (Hwair)".format(0x10348)
-      FastBytesReaderProps.parse(str, -1) ==> str
+    if (parsed != str) {
+      assert(
+        false,
+        s"FAIL ($parsed) != ($str) | ${parsed.toList.map(_.toLong.toHexString)} ${str.toList.map(_.toLong.toHexString)}"
+      )
     }
+  }
+
+  def testRebuildString = Gen.prop(Gen.unicode(), Gen.int) { (str: String, num: Int) =>
+    val retractAt = if (str.isEmpty) -1 else (num.abs % str.length)
+    assertParse(str, retractAt)
+  }
+
+  // this is covered by the prop tests but is a useful standalone test
+  def testSurrogatePairs = {
+    // 0x10348 into 0xd800, 0xdf48
+    val str = "wibble wobble I'm a %c (Hwair)".format(0x10348)
+    assertParse(str, -1)
+  }
+
+  // the character in this test is not a valid character on its own, being both
+  // a surrogate and a BMP. It's unclear what the utf-8 / utf-16 encoding of
+  // these things are.
+  def ignoreBizarroCodepoints = {
+    val str = "%c".format(0xdf87)
+
+    // println(str.getBytes("utf-8").toList.map(_.toLong.toHexString))
+    // => 0x3F
+
+    assertParse(str, -1)
   }
 
 }

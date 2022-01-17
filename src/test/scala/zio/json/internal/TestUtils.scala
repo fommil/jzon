@@ -1,6 +1,12 @@
-package zio.json
+package zio.json.internal
 
 import java.nio.CharBuffer
+import zio.json._
+
+abstract class Test extends junit.framework.TestCase {
+  final def assertEquals[A](expected: A, got: A): Unit =
+    assert(expected == got, s"$got != $expected")
+}
 
 object TestUtils {
   // by plokhotnyuk
@@ -40,7 +46,7 @@ object TestUtils {
 
   def asBytes(str: String): Array[Byte] = str.getBytes("utf-8")
 
-  def getResourceAsReader(res: String): internal.RetractReader =
+  def getResourceAsReader(res: String): RetractReader =
     new internal.FastStringReader(getResourceAsString(res))
 
 }

@@ -1,49 +1,35 @@
 package zio.json.internal
 
-import scalaprops._
-import Property.{ implies, prop, property }
-
 import zio.json._
 import zio.json.syntax._
-import zio.json.GenAst._
 
-import utest._
+class LexerTest extends Test {
 
-// testOnly *LexerTest*
-object LexerProps extends Scalaprops {
-
-  val skipPretty = property { (j: JsValue) =>
+  def testPrettyParsesPolitely = Gen.prop(GenAst.ast) { j =>
     val in  = new FastStringReader(j.toJsonPretty)
     val out = new FastStringWriter(1024)
     Lexer.skipValue(Nil, in, out)
-    prop(out.toString == j.toJson)
+    assertEquals(j.toJson, out.toString)
   }
 
-}
+  def testIgnoreStrings = {
+    val str = "\"\\\"\"" // "\""
 
-// known bad cases
-object LexerTest extends TestSuite {
+    val in  = new FastStringReader(str)
+    val out = new FastStringWriter(1024)
+    Lexer.skipValue(Nil, in, out)
 
-  val tests = Tests {
-    test("ignore strings") {
-      val str = "\"\\\"\"" // "\""
+    assertEquals(str, out.toString)
+  }
 
-      val in  = new FastStringReader(str)
-      val out = new FastStringWriter(1024)
-      Lexer.skipValue(Nil, in, out)
+  def testGeojson1 = {
+    val str = TestUtils.getResourceAsString("che.geo.json")
 
-      out.toString ==> str
-    }
+    val in  = new FastStringReader(str)
+    val out = new FastStringWriter(1024)
+    Lexer.skipValue(Nil, in, out)
 
-    test("geojson1") {
-      val str = TestUtils.getResourceAsString("che.geo.json")
-
-      val in  = new FastStringReader(str)
-      val out = new FastStringWriter(1024)
-      Lexer.skipValue(Nil, in, out)
-
-      out.toString ==> str
-    }
+    assertEquals(str, out.toString)
   }
 
 }

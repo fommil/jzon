@@ -1,14 +1,8 @@
 package zio.json.internal
 
-import scalaprops._
-import Property.{ implies, prop, property }
-import utest._
+class StringMatrixTest extends Test {
 
-// testOnly *StringMatrix*
-object StringMatrixProps extends Scalaprops {
-  val nonEmptyString: Gen[String] = Gen.nonEmptyString(Gen.alphaNumChar)
-  val testStrings: Gen[List[String]] =
-    Gen.choose(1, 63).flatMap(n => Gen.sequenceNList(n, nonEmptyString))
+  def fail(msg: String): Nothing = throw new AssertionError(msg)
 
   def matcher(xs: List[String], test: String): List[String] = {
     val m = new StringMatrix(xs.toArray)
@@ -30,35 +24,33 @@ object StringMatrixProps extends Scalaprops {
     hits
   }
 
-  val positiveSucceeds = property { xs: List[String] => xs.map(s => prop(matcher(xs, s).contains(s))).reduce(_ and _) }(
-    testStrings,
-    Shrink.empty
-  )
+  val genStrings: Gen[List[String]] = Gen.nel(Gen.alphanumeric(), 63)
 
-  val negativeFails = property { xs: List[String] =>
-    implies(
-      !xs.exists(_.startsWith("wibble")),
-      prop(matcher(xs, "wibble") == Nil)
-    )
-  }(testStrings, Shrink.empty)
-
-  val substringFails = property { xs: List[String] => implies(xs.length > 1, prop(matcher(xs, xs.mkString) == Nil)) }(
-    testStrings,
-    Shrink.empty
-  )
-
-  val trivial = property { s: String => prop(matcher(List(s), s) == List(s)) }(nonEmptyString, Shrink.empty)
-}
-
-object StringMatrixTest extends TestSuite {
-
-  val tests = Tests {
-    test("exact match is a substring") {
-      StringMatrixProps.matcher(
-        List("retweeted_status", "retweeted"),
-        "retweeted"
-      ) ==> List("retweeted")
-    }
+  def testPositiveSucceeds = Gen.prop(genStrings) { xs: List[String] =>
+    xs.foreach(s => matcher(xs, s).contains(s) || fail(xs.toString))
   }
+
+  def testNegativeFails = Gen.prop(genStrings) { xs: List[String] =>
+    xs.exists(_.startsWith("wibble")) ||
+    matcher(xs, "wibble") == Nil ||
+    fail(xs.toString)
+  }
+
+  def testSubstringFails = Gen.prop(genStrings) { xs: List[String] =>
+    xs.length < 2 ||
+    matcher(xs, xs.mkString) == Nil ||
+    fail(xs.toString)
+  }
+
+  def testTrivial = Gen.prop(Gen.alphanumeric()) { s: String =>
+    matcher(List(s), s) == List(s) ||
+    fail(s)
+  }
+
+  def testExactMatchIsASubstring =
+    assertEquals(
+      List("retweeted"),
+      matcher(List("retweeted_status", "retweeted"), "retweeted")
+    )
 
 }
