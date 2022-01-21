@@ -237,7 +237,7 @@ package handrolled {
           var subtype: Int               = -1
 
           if (Lexer.firstObject(trace, in))
-            do {
+            while ({
               val field = Lexer.field(trace, in, matrix)
               if (field == -1) Lexer.skipValue(trace, in, null)
               else {
@@ -258,7 +258,8 @@ package handrolled {
                     geometries = geometriesD.unsafeDecode(trace_, in)
                 }
               }
-            } while (Lexer.nextObject(trace, in))
+              Lexer.nextObject(trace, in)
+            }) {}
 
           if (subtype == -1)
             throw UnsafeJson(
@@ -341,7 +342,7 @@ package handrolled {
           var subtype: Int                    = -1
 
           if (Lexer.firstObject(trace, in))
-            do {
+            while ({
               val field = Lexer.field(trace, in, matrix)
               if (field == -1) Lexer.skipValue(trace, in, null)
               else {
@@ -369,7 +370,8 @@ package handrolled {
                     features = featuresD.unsafeDecode(trace_, in)
                 }
               }
-            } while (Lexer.nextObject(trace, in))
+              Lexer.nextObject(trace, in)
+            }) {}
 
           if (subtype == -1)
             // we could infer the type but that would mean accepting invalid data

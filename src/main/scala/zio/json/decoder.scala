@@ -191,7 +191,7 @@ object Decoder extends DecoderGenerated with DecoderLowPriority1 {
         val values: Array[Any] = Array.ofDim(2)
 
         if (Lexer.firstObject(trace, in))
-          do {
+          while ({
             val field = Lexer.field(trace, in, matrix)
             if (field == -1) Lexer.skipValue(trace, in, null)
             else {
@@ -206,7 +206,8 @@ object Decoder extends DecoderGenerated with DecoderLowPriority1 {
                 values(1) = B.unsafeDecode(trace_, in)
               }
             }
-          } while (Lexer.nextObject(trace, in))
+            Lexer.nextObject(trace, in)
+          }) {}
 
         if (values(0) == null && values(1) == null)
           throw UnsafeJson(JsonError.Message("missing fields") :: trace)
@@ -227,11 +228,12 @@ object Decoder extends DecoderGenerated with DecoderLowPriority1 {
   )(implicit A: Decoder[A]): T[A] = {
     Lexer.char(trace, in, '[')
     var i: Int = 0
-    if (Lexer.firstArray(trace, in)) do {
+    if (Lexer.firstArray(trace, in)) while ({
       val trace_ = JsonError.ArrayAccess(i) :: trace
       builder += A.unsafeDecode(trace_, in)
       i += 1
-    } while (Lexer.nextArray(trace, in))
+      Lexer.nextArray(trace, in)
+    }) {}
     builder.result()
   }
 
@@ -249,16 +251,14 @@ object Decoder extends DecoderGenerated with DecoderLowPriority1 {
 //    otherwise conflict in a lower priority scope. A good example of this is to
 //    have specialised decoders for collection types, falling back to BuildFrom.
 private[json] trait DecoderLowPriority1 {
-  this: Decoder.type =>
-
   implicit def list[A: Decoder]: Decoder[List[A]] = new Decoder[List[A]] {
     def unsafeDecode(trace: List[JsonError], in: RetractReader): List[A] =
-      builder(trace, in, new mutable.ListBuffer[A])
+      Decoder.builder(trace, in, new mutable.ListBuffer[A])
   }
 
   implicit def vector[A: Decoder]: Decoder[Vector[A]] = new Decoder[Vector[A]] {
     def unsafeDecode(trace: List[JsonError], in: RetractReader): Vector[A] =
-      builder(trace, in, new immutable.VectorBuilder[A]).toVector
+      Decoder.builder(trace, in, new immutable.VectorBuilder[A]).toVector
   }
 
   implicit def seq[A: Decoder]: Decoder[Seq[A]] = list[A].widen
@@ -277,13 +277,14 @@ private[json] trait DecoderLowPriority1 {
         val builder = new mutable.ListBuffer[(K, A)]
         Lexer.char(trace, in, '{')
         if (Lexer.firstObject(trace, in))
-          do {
+          while ({
             val field  = Lexer.string(trace, in).toString
             val trace_ = JsonError.ObjectAccess(field) :: trace
             Lexer.char(trace_, in, ':')
             val value = A.unsafeDecode(trace_, in)
             builder += ((K.unsafeDecodeField(trace_, field), value))
-          } while (Lexer.nextObject(trace, in))
+            Lexer.nextObject(trace, in)
+          }) {}
         builder.result()
       }
     }
@@ -359,7 +360,7 @@ private[json] abstract class CaseClassDecoder[A, CC <: shapely.CaseClass[A]](M: 
 
     val ps: Array[Any] = Array.ofDim(names.length)
     if (Lexer.firstObject(trace, in))
-      do {
+      while ({
         var trace_ = trace
         val field  = Lexer.field(trace, in, matrix)
         if (field != -1) {
@@ -374,7 +375,9 @@ private[json] abstract class CaseClassDecoder[A, CC <: shapely.CaseClass[A]](M: 
           )
         } else
           Lexer.skipValue(trace_, in, null)
-      } while (Lexer.nextObject(trace, in))
+
+        Lexer.nextObject(trace, in)
+      }) {}
 
     var i = 0
     while (i < names.length) {
@@ -428,7 +431,7 @@ private[json] abstract class SealedTraitDiscrimDecoder[A, ST <: shapely.SealedTr
 
     Lexer.char(trace, in, '{')
     if (Lexer.firstObject(trace, in))
-      do {
+      while ({
         // materialise the string since we don't know what it can be
         val field = Lexer.string(trace, in)
         Lexer.char(trace, in, ':')
@@ -448,7 +451,8 @@ private[json] abstract class SealedTraitDiscrimDecoder[A, ST <: shapely.SealedTr
           Lexer.skipValue(trace, in, out)
           fields ::= (field -> out.buffer) // duplicates will be caught later
         }
-      } while (Lexer.nextObject(trace, in))
+        Lexer.nextObject(trace, in)
+      }) {}
 
     if (hint == -1)
       throw UnsafeJson(JsonError.Message(s"missing disambiguator '$hintfield'") :: trace)

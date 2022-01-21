@@ -26,23 +26,23 @@ class StringMatrixTest extends Test {
 
   val genStrings: Gen[List[String]] = Gen.nel(Gen.alphanumeric(), 63)
 
-  def testPositiveSucceeds = Gen.prop(genStrings) { xs: List[String] =>
+  def testPositiveSucceeds = Gen.prop(genStrings) { xs =>
     xs.foreach(s => matcher(xs, s).contains(s) || fail(xs.toString))
   }
 
-  def testNegativeFails = Gen.prop(genStrings) { xs: List[String] =>
+  def testNegativeFails = Gen.prop(genStrings) { xs =>
     xs.exists(_.startsWith("wibble")) ||
     matcher(xs, "wibble") == Nil ||
     fail(xs.toString)
   }
 
-  def testSubstringFails = Gen.prop(genStrings) { xs: List[String] =>
+  def testSubstringFails = Gen.prop(genStrings) { xs =>
     xs.length < 2 ||
     matcher(xs, xs.mkString) == Nil ||
     fail(xs.toString)
   }
 
-  def testTrivial = Gen.prop(Gen.alphanumeric()) { s: String =>
+  def testTrivial = Gen.prop(Gen.alphanumeric()) { s =>
     matcher(List(s), s) == List(s) ||
     fail(s)
   }

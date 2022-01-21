@@ -68,14 +68,14 @@ object CodeGen {
        |import scala.annotation._
        |import shapely._
        |
-       |private[json] trait EncoderGenerated { this: Encoder.type =>
+       |private[json] trait EncoderGenerated {
        |  implicit def caseclass0[A]: Encoder[CaseClass0[A]] = new Encoder[CaseClass0[A]] {
        |    override def unsafeEncode(a: CaseClass0[A], indent: Option[Int], out: java.io.Writer): Unit = out.write("{}")
        |  }
        |
-       |  ${caseclasses.mkString("\n\n  ")}
-       |  ${sealedtraits.mkString("\n\n  ")}
-       |  ${tuples.mkString("\n\n  ")}
+       |${caseclasses.mkString("\n\n")}
+       |${sealedtraits.mkString("\n\n")}
+       |${tuples.mkString("\n\n")}
        |}""".stripMargin
   }
 
@@ -98,8 +98,9 @@ object CodeGen {
       val tparams   = (1 to i).map(p => s"A$p <: A").mkString(", ")
       val tparams_  = (1 to i).map(p => s"A$p").mkString(", ")
       val implicits = (1 to i).map(p => s"A$p: Lazy[Decoder[A$p]], M$p: Meta[A$p]").mkString(", ")
-      val instances = (1 to i).map(p => s"A${p}.value.map(SealedTrait._${p}(_))").mkString(", ")
-      val metas     = (1 to i).map(p => s"M$p").mkString(", ")
+      val instances =
+        (1 to i).map(p => s"A${p}.value.map(v => SealedTrait._${p}(v): SealedTrait$i[A, $tparams_])").mkString(", ")
+      val metas = (1 to i).map(p => s"M$p").mkString(", ")
 
       s"""  implicit def sealedtrait$i[A, $tparams](implicit M: Meta[A], $implicits): Decoder[SealedTrait$i[A, $tparams_]] = {
          |    def instances: Array[Decoder[SealedTrait$i[A, $tparams_]]] = Array($instances)
@@ -143,7 +144,9 @@ object CodeGen {
        |import shapely._
        |import zio.json.internal._
        |
-       |private[json] trait DecoderGenerated { this: Decoder.type =>
+       |import Decoder.JsonError
+       |
+       |private[json] trait DecoderGenerated {
        |
        |  implicit def caseclass0[A](implicit M: Meta[A]): Decoder[CaseClass0[A]] = new Decoder[CaseClass0[A]] {
        |    val no_extra = M.annotations.collectFirst { case _: no_extra_fields => () }.isDefined
@@ -158,9 +161,9 @@ object CodeGen {
        |    }
        |  }
        |
-       |  ${caseclasses.mkString("\n\n  ")}
-       |  ${sealedtraits.mkString("\n\n  ")}
-       |  ${tuples.mkString("\n\n  ")}
+       |${caseclasses.mkString("\n\n")}
+       |${sealedtraits.mkString("\n\n")}
+       |${tuples.mkString("\n\n")}
        |}""".stripMargin
   }
 }

@@ -28,7 +28,7 @@ final case class JsArray(elements: List[JsValue])          extends JsValue
 final case class JsBoolean(value: Boolean)                 extends JsValue
 final case class JsString(value: String)                   extends JsValue
 final case class JsNumber(value: java.math.BigDecimal)     extends JsValue
-final case object JsNull                                   extends JsValue with JsNullCompanion
+case object JsNull                                         extends JsValue with JsNullCompanion
 
 object JsValue {
   implicit val decoder: Decoder[JsValue] = new Decoder[JsValue] {

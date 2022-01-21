@@ -1,8 +1,8 @@
 organization := "dev.zio"
 name := "zio-json"
 
-ThisBuild / crossScalaVersions := Seq("2.12.11", "2.13.8")
-ThisBuild / scalaVersion := crossScalaVersions.value.last
+ThisBuild / crossScalaVersions := Seq("2.13.8", "2.12.15", "3.1.1")
+ThisBuild / scalaVersion := crossScalaVersions.value.head
 
 scalacOptions ++= Seq(
   "-language:_",
@@ -10,7 +10,7 @@ scalacOptions ++= Seq(
 )
 
 lazy val shapely =
-  ProjectRef(uri("https://gitlab.com/fommil/shapely.git#41bba89f12ac01b9d7480e2ff0127a4552c60f3e"), "shapely")
+  ProjectRef(uri("https://gitlab.com/fommil/shapely.git#f4135d96faf9cfa8d63d6fd7706666eb6243556f"), "shapely")
 lazy val root = (project in file(".")) dependsOn shapely
 
 Compile / sourceGenerators += Def.task {
@@ -25,36 +25,37 @@ Compile / sourceGenerators += Def.task {
   gen.map(_._2)
 }.taskValue
 
-libraryDependencies += "org.scalaz" %% "scalaz-core" % "7.3.2" intransitive ()
-libraryDependencies += "eu.timepit" %% "refined"     % "0.9.15" intransitive ()
+libraryDependencies += "org.scalaz" %% "scalaz-core" % "7.3.6" intransitive ()
+libraryDependencies += "eu.timepit" %% "refined"     % "0.9.28" intransitive ()
 
 libraryDependencies ++= Seq(
-  "com.novocode" % "junit-interface" % "0.11" % Test,
-  "junit"        % "junit"           % "4.11" % Test
+  "com.novocode" % "junit-interface" % "0.11"   % Test,
+  "junit"        % "junit"           % "4.13.2" % Test
 )
 crossPaths := false // https://github.com/sbt/junit-interface/issues/35
 testOptions += Tests.Argument(TestFrameworks.JUnit, "-v")
 fork := true
-
-// TODO prove that it works on Scala 3
 
 //////////////////////////////
 // PERF TESTING
 enablePlugins(NeoJmhPlugin)
 inConfig(Jmh)(org.scalafmt.sbt.ScalafmtPlugin.scalafmtConfigSettings)
 
-libraryDependencies ++= Seq(
-  "com.github.plokhotnyuk.jsoniter-scala" %% "jsoniter-scala-core"   % "2.5.0"  % "test,jmh",
-  "com.github.plokhotnyuk.jsoniter-scala" %% "jsoniter-scala-macros" % "2.5.0"  % "test,jmh",
-  "io.circe"                              %% "circe-generic-extras"  % "0.13.0" % "test,jmh",
-  "com.typesafe.play"                     %% "play-json"             % "2.9.0"  % "test,jmh",
-  "ai.x"                                  %% "play-json-extensions"  % "0.42.0" % "test,jmh"
-)
-libraryDependencies ++= Seq(
-  "io.circe" %% "circe-core",
-  "io.circe" %% "circe-generic",
-  "io.circe" %% "circe-parser"
-).map(_ % "0.13.0" % "test,jmh")
-//////////////////////////////
+libraryDependencies ++= {
+  // circe-generic-extras and play-json-extensions not available for Scala 3
+  if (scalaVersion.value.startsWith("3")) Nil
+  else
+    Seq(
+      "com.github.plokhotnyuk.jsoniter-scala" %% "jsoniter-scala-core"   % "2.12.1"  % "test,jmh",
+      "com.github.plokhotnyuk.jsoniter-scala" %% "jsoniter-scala-macros" % "2.12.1"  % "test,jmh",
+      "io.circe"                              %% "circe-generic-extras"  % "0.13.0" % "test,jmh",
+      "com.typesafe.play"                     %% "play-json"             % "2.9.0"  % "test,jmh",
+      "ai.x"                                  %% "play-json-extensions"  % "0.42.0" % "test,jmh"
+    ) ++ Seq(
+      "io.circe" %% "circe-core",
+      "io.circe" %% "circe-generic",
+      "io.circe" %% "circe-parser"
+    ).map(_ % "0.14.1" % "test,jmh")
+} //////////////////////////////
 
 addCommandAlias("fmt", "all scalafmtSbt scalafmt test:scalafmt jmh:scalafmt")

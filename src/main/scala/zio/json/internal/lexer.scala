@@ -107,7 +107,7 @@ object Lexer {
       case '{' =>
         var first = true
         if (firstObject(trace, in)) {
-          do {
+          while ({
             if (first) first = false
             else if (out ne null) out.write(',')
             char(trace, in, '"')
@@ -116,17 +116,19 @@ object Lexer {
             char(trace, in, ':')
             if (out ne null) out.write(':')
             skipValue(trace, in, out)
-          } while (nextObject(trace, in))
+            nextObject(trace, in)
+          }) {}
         }
         if (out ne null) out.append('}')
       case '[' =>
         var first = true
         if (firstArray(trace, in)) {
-          do {
+          while ({
             if (first) first = false
             else if (out ne null) out.write(',')
             skipValue(trace, in, out)
-          } while (nextArray(trace, in))
+            nextArray(trace, in)
+          }) {}
         }
         if (out ne null) out.append(']')
       case '"' =>

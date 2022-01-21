@@ -6,13 +6,16 @@ import zio.json.syntax._
 
 import eu.timepit.refined.api.Refined
 import eu.timepit.refined.collection.NonEmpty
-import eu.timepit.refined.auto._
+import eu.timepit.refined.refineV
 
 import zio.json.compat.refined._
 
 class RefinedTest extends Test {
 
   case class Person(name: String Refined NonEmpty)
+
+  // the macro doesn't work on Scala 3 so we have to be explicit
+  val fommil = refineV[NonEmpty]("fommil").toOption.get
 
   object Person {
     implicit val decoder: Decoder[Person] = Decoder.derived
@@ -26,13 +29,13 @@ class RefinedTest extends Test {
     )
 
     assertEquals(
-      Right(Person("fommil")),
+      Right(Person(fommil)),
       parser.decode[Person]("""{"name":"fommil"}""")
     )
 
     assertEquals(
       """{"name":"fommil"}""",
-      Person("fommil").toJson
+      Person(fommil).toJson
     )
   }
 
