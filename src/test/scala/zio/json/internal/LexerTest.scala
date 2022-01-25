@@ -1,6 +1,5 @@
 package zio.json.internal
 
-import zio.json._
 import zio.json.syntax._
 
 class LexerTest extends Test {

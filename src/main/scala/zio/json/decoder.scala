@@ -115,7 +115,7 @@ object Decoder extends DecoderGenerated with DecoderLowPriority1 {
 
   implicit val char: Decoder[Char] = string.emap {
     case str if str.length == 1 => Right(str(0))
-    case other                  => Left("expected one character")
+    case _                      => Left("expected one character")
   }
   implicit val symbol: Decoder[Symbol] = string.map(Symbol(_))
 
@@ -364,7 +364,6 @@ private[json] abstract class CaseClassDecoder[A, CC <: shapely.CaseClass[A]](M: 
         var trace_ = trace
         val field  = Lexer.field(trace, in, matrix)
         if (field != -1) {
-          val field_ = names(field)
           trace_ = spans(field) :: trace
           if (ps(field) != null)
             throw UnsafeJson(JsonError.Message("duplicate") :: trace_)
@@ -404,7 +403,6 @@ private[json] abstract class SealedTraitDecoder[A, ST <: shapely.SealedTrait[A]]
     if (Lexer.firstObject(trace, in)) {
       val field = Lexer.field(trace, in, matrix)
       if (field != -1) {
-        val field_ = names(field)
         val trace_ = spans(field) :: trace
         val a      = tcs(field).unsafeDecode(trace_, in)
         Lexer.char(trace, in, '}')

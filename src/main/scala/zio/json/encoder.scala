@@ -1,7 +1,6 @@
 package zio.json
 
 import scala.annotation._
-import scala.collection.mutable
 import scala.collection.immutable
 
 import zio.json.internal._
@@ -190,7 +189,7 @@ private[json] trait EncoderLowPriority1 {
     list[A].contramap(_.toList)
   implicit def hashset[A: Encoder]: Encoder[immutable.HashSet[A]] =
     list[A].contramap(_.toList)
-  implicit def sortedset[A: Ordering: Encoder]: Encoder[immutable.SortedSet[A]] =
+  implicit def sortedset[A: Encoder]: Encoder[immutable.SortedSet[A]] =
     list[A].contramap(_.toList)
 
 }

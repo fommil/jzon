@@ -1,7 +1,6 @@
 package zio.json.internal
 
 import zio.json._
-import zio.json.syntax._
 
 object GenAst {
   // all self-references to impl must be in a Gen.delay to avoid NPE
@@ -15,7 +14,7 @@ object GenAst {
     val obj: Gen[JsValue] = Gen.delay(Gen.list(entry, size)).map(JsObject(_))
     val arr: Gen[JsValue] = Gen.delay(Gen.list(value, size)).map(JsArray(_))
 
-    Gen.oneOf(obj, arr, boo, str, num)
+    Gen.oneOf(obj, arr, boo, str, num, nul)
   }
 
   private val boo: Gen[JsValue] = Gen.boolean.map(JsBoolean(_))

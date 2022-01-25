@@ -1,6 +1,5 @@
 package zio.json.internal
 
-import java.nio.CharBuffer
 import zio.json._
 
 abstract class Test extends junit.framework.TestCase {

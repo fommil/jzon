@@ -1,7 +1,5 @@
 package zio.json
 
-import scala.collection.immutable
-
 import zio.json.internal._
 import zio.json.syntax._
 

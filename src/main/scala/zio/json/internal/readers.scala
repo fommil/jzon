@@ -1,11 +1,8 @@
 package zio.json.internal
 
-import java.lang.IllegalArgumentException
 import java.util.Arrays
 import scala.annotation.switch
 import scala.util.control.NoStackTrace
-
-import zio.json.Decoder.{ JsonError, UnsafeJson }
 
 trait OneCharReader {
   // Cautious read: -1 on EOF
