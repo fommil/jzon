@@ -42,7 +42,7 @@ class DecoderTest extends Test {
     @hint("Cain")
     case class Child1() extends Parent
     @hint("Abel")
-    case class Child2() extends Parent
+    case class Child2(@field("lamb") sheep: Int) extends Parent
 
     object Parent {
       implicit val decoder: Decoder[Parent] = Decoder.derived
@@ -110,7 +110,7 @@ class DecoderTest extends Test {
     import examplealtsum._
 
     assertEquals(Right(Child1()), parser.decode[Parent]("""{"hint":"Cain"}"""))
-    assertEquals(Right(Child2()), parser.decode[Parent]("""{"hint":"Abel"}"""))
+    assertEquals(Right(Child2(1)), parser.decode[Parent]("""{"hint":"Abel", "lamb":1}"""))
     assertEquals(Left("(invalid disambiguator in 'hint')"), parser.decode[Parent]("""{"hint":"Samson"}"""))
     assertEquals(Left("(missing disambiguator 'hint')"), parser.decode[Parent]("""{"Cain":{}}"""))
     assertEquals(Left("(duplicate disambiguator 'hint')"), parser.decode[Parent]("""{"hint":"Cain", "hint":"Cain"}"""))

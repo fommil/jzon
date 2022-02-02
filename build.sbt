@@ -11,7 +11,12 @@ scalacOptions ++= Seq(
 
 lazy val shapely =
   ProjectRef(uri("https://gitlab.com/fommil/shapely.git#f4135d96faf9cfa8d63d6fd7706666eb6243556f"), "shapely")
-lazy val root = (project in file(".")) dependsOn shapely
+lazy val root = (project in file("."))
+  .dependsOn(shapely)
+  .settings(
+    // https://www.yourkit.com/docs/java/help/startup_options.jsp
+    // Jmh / neoJmhYourkit := Seq("disabletracing,disablenatives,exceptions=disable,allocsampled")
+  )
 
 Compile / sourceGenerators += Def.task {
   val dir = (Compile / sourceManaged).value
@@ -46,8 +51,8 @@ libraryDependencies ++= {
   if (scalaVersion.value.startsWith("3")) Nil
   else
     Seq(
-      "com.github.plokhotnyuk.jsoniter-scala" %% "jsoniter-scala-core"   % "2.12.1"  % "test,jmh",
-      "com.github.plokhotnyuk.jsoniter-scala" %% "jsoniter-scala-macros" % "2.12.1"  % "test,jmh",
+      "com.github.plokhotnyuk.jsoniter-scala" %% "jsoniter-scala-core"   % "2.12.1" % "test,jmh",
+      "com.github.plokhotnyuk.jsoniter-scala" %% "jsoniter-scala-macros" % "2.12.1" % "test,jmh",
       "io.circe"                              %% "circe-generic-extras"  % "0.13.0" % "test,jmh",
       "com.typesafe.play"                     %% "play-json"             % "2.9.0"  % "test,jmh",
       "ai.x"                                  %% "play-json-extensions"  % "0.42.0" % "test,jmh"
