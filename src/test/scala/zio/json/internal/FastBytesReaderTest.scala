@@ -3,7 +3,7 @@ package zio.json.internal
 class FastBytesReaderTest extends Test {
 
   def assertParse(str: String, retractAt: Int): Unit = {
-    val in      = new FastBytesReader(str.getBytes("utf-8"))
+    val in      = new FastBytesReader(new ByteArrayInput(str.getBytes("utf-8")))
     val builder = new FastStringWriter(str.length)
     var i       = 0
 

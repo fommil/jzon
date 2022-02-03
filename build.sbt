@@ -54,6 +54,8 @@ libraryDependencies ++= {
       "com.github.plokhotnyuk.jsoniter-scala" %% "jsoniter-scala-core"   % "2.12.1" % "test,jmh",
       "com.github.plokhotnyuk.jsoniter-scala" %% "jsoniter-scala-macros" % "2.12.1" % "test,jmh",
       "io.circe"                              %% "circe-generic-extras"  % "0.13.0" % "test,jmh",
+      "io.circe"                              %% "circe-fs2"             % "0.14.0" % "test,jmh",
+      "co.fs2"                                %% "fs2-io"                % "3.2.4"  % "test,jmh",
       "com.typesafe.play"                     %% "play-json"             % "2.9.0"  % "test,jmh",
       "ai.x"                                  %% "play-json-extensions"  % "0.42.0" % "test,jmh"
     ) ++ Seq(

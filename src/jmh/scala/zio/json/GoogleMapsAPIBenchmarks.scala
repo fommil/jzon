@@ -1,20 +1,27 @@
 package zio.json
 
+import java.io.BufferedInputStream
+import java.io.File
+import java.io.FileInputStream
+import java.nio.file.Files
 import java.util.Arrays
 import java.nio.charset.StandardCharsets.UTF_8
+import java.nio.file.StandardOpenOption.{ APPEND, CREATE }
 import java.util.concurrent.TimeUnit
+import scala.util.Try
 
-import zio.json
 import com.github.plokhotnyuk.jsoniter_scala.core._
 import com.github.plokhotnyuk.jsoniter_scala.macros._
-import io.circe
+import org.openjdk.jmh.annotations._
+
 import zio.json.GoogleMapsAPIBenchmarks._
 import zio.json.internal.TestUtils._
+import zio.json.internal._
 import zio.json.perfdata.googlemaps._
-import org.openjdk.jmh.annotations._
-import play.api.libs.{ json => Play }
 
-import scala.util.Try
+import play.api.libs.{ json => Play }
+import zio.json
+import io.circe
 
 // To enable the yourkit agent enable a profiling mode, e.g.:
 //
@@ -63,15 +70,16 @@ class GoogleMapsAPIBenchmarks {
   var jsonBytesAttack0, jsonBytesAttack1, jsonBytesAttack2, jsonBytesAttack3: Array[Byte]           = _
   var decoded: DistanceMatrix                                                                       = _
 
+  val bigdupes = 1000
+  val bigfile  = new File("target/big.json")
+
   @Setup
   def setup(): Unit = {
     //Distance Matrix API call for top-10 by population cities in US:
     //https://maps.googleapis.com/maps/api/distancematrix/json?origins=New+York|Los+Angeles|Chicago|Houston|Phoenix+AZ|Philadelphia|San+Antonio|San+Diego|Dallas|San+Jose&destinations=New+York|Los+Angeles|Chicago|Houston|Phoenix+AZ|Philadelphia|San+Antonio|San+Diego|Dallas|San+Jose
     jsonString = getResourceAsString("google_maps_api_response.json")
     jsonBytes = asBytes(jsonString)
-    jsonStringCompact = getResourceAsString(
-      "google_maps_api_compact_response.json"
-    )
+    jsonStringCompact = getResourceAsString("google_maps_api_compact_response.json").trim
     jsonBytesCompact = asBytes(jsonStringCompact)
     jsonStringErr = getResourceAsString("google_maps_api_error_response.json")
     jsonBytesErr = asBytes(jsonStringErr)
@@ -79,9 +87,7 @@ class GoogleMapsAPIBenchmarks {
     // jmh:run GoogleMaps.*ErrorParse
     jsonStringErrParse = getResourceAsString("google_maps_api_error_parse.json")
     jsonBytesErrParse = asBytes(jsonStringErr)
-    jsonStringErrNumber = getResourceAsString(
-      "google_maps_api_error_number.json"
-    )
+    jsonStringErrNumber = getResourceAsString("google_maps_api_error_number.json")
     jsonBytesErrNumber = asBytes(jsonStringErr)
 
     jsonStringAttack0 = getResourceAsString("google_maps_api_attack0.json")
@@ -94,6 +100,9 @@ class GoogleMapsAPIBenchmarks {
     jsonBytesAttack3 = asBytes(jsonStringAttack3)
 
     decoded = circe.parser.decode[DistanceMatrix](jsonString).toOption.get
+
+    bigfile.delete()
+    (1 to bigdupes).foreach(_ => Files.writeString(bigfile.toPath, jsonStringCompact + "\n", APPEND, CREATE))
 
     assert(decodeCirceSuccess1() == decodeZioSuccess1())
     assert(decodeCirceSuccess2() == decodeZioSuccess2())
@@ -111,6 +120,7 @@ class GoogleMapsAPIBenchmarks {
     assert(decodeCirceSuccess1() == decodeCirceAttack2())
     assert(decodeCirceSuccess1() == decodeZioAttack2())
     assert(decodeCirceSuccess1() == decodePlayAttack2())
+
   }
 
   // @Benchmark
@@ -278,6 +288,91 @@ class GoogleMapsAPIBenchmarks {
   @Benchmark
   def decodeZioAttack3(): Either[String, DistanceMatrix] =
     json.Decoder[DistanceMatrix].decodeJson(jsonBytesAttack3)
+
+  // as in "old" IO
+  @Benchmark
+  def decodeZioBigOld(): Int = {
+    import zio.json.async._
+
+    var decoded = 0
+
+    // 64k to match fs2
+    val buf    = Array.ofDim[Byte](64 * 1024)
+    var length = 0
+    val in     = new FileInputStream(bigfile)
+
+    val callback = { c: Chunks =>
+      if (!c.isEmpty) {
+        val dm = json.Decoder[DistanceMatrix].decodeJson(c)
+        if (dm.isRight) decoded += 1
+      }
+    }
+    val chunker = new Chunker(1024 * 1024, true, callback)
+
+    while ({ length = in.read(buf); length > 0 }) {
+      chunker.accept(buf, length)
+    }
+    in.close()
+    chunker.accept(null, -1)
+
+    assert(decoded == bigdupes)
+    decoded
+  }
+
+  // TODO zio-json using NIO
+  // TODO zio-json using zio-stream
+
+  @Benchmark
+  def decodeCirceBig(): Long = {
+    import cats.effect.IO
+    import fs2._
+    import circe.fs2._
+    import circe.Json
+    import cats.effect.unsafe.implicits.global
+
+    // uses 64k chunks
+    val path                           = fs2.io.file.Path.fromNioPath(bigfile.toPath)
+    val byteStream: Stream[IO, Byte]   = fs2.io.file.Files[IO].readAll(path)
+    val parsedStream: Stream[IO, Json] = byteStream.through(byteStreamParser)
+    val model                          = parsedStream.through(decoder[IO, DistanceMatrix])
+
+    val decoded = model.compile.count.unsafeRunSync()
+    assert(decoded == bigdupes)
+    decoded
+  }
+
+  @Benchmark
+  def decodeJsonitorBigOld(): Int = {
+    import zio.json.async._
+
+    var decoded = 0
+
+    // 64k to match fs2
+    val buf    = Array.ofDim[Byte](64 * 1024)
+    var length = 0
+    val in     = new FileInputStream(bigfile)
+
+    val callback = { c: Chunks =>
+      if (!c.isEmpty) {
+        // trades off memory churn (ChunksInput has minimal allocations) for
+        // throughput (.toArray faster)
+
+        // val dm = readFromArray[DistanceMatrix](c.toArray)
+        val dm = readFromStream[DistanceMatrix](new ChunksInput(c))
+        decoded += 1
+      }
+    }
+    val chunker = new Chunker(1024 * 1024, true, callback)
+
+    while ({ length = in.read(buf); length > 0 }) {
+      chunker.accept(buf, length)
+    }
+    in.close()
+    chunker.accept(null, -1)
+
+    assert(decoded == bigdupes)
+    decoded
+  }
 
 }
 

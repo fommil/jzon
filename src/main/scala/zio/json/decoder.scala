@@ -28,7 +28,9 @@ object parser {
 trait Decoder[A] { self =>
   // note that the string may not be fully consumed
   final def decodeJson(str: CharSequence): Either[String, A] = safely(new FastStringReader(str))
-  final def decodeJson(str: Array[Byte]): Either[String, A]  = safely(new FastBytesReader(str))
+  final def decodeJson(bs: Array[Byte]): Either[String, A]   = decodeJson(new ByteArrayInput(bs))
+  final def decodeJson(bs: Chunks): Either[String, A]        = decodeJson(new ChunksInput(bs))
+  final def decodeJson(bs: ByteInput): Either[String, A]     = safely(new FastBytesReader(bs))
   final private[this] def safely(in: RetractReader): Either[String, A] =
     try Right(unsafeDecode(Nil, in))
     catch {

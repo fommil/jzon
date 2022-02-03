@@ -97,42 +97,34 @@ final class FastStringReader(cs: CharSequence) extends RetractReader {
   }
 }
 
-final class FastBytesReader(utf8: Array[Byte]) extends RetractReader {
-  private[this] var i: Int = 0
-
-  // size of the last multibyte that was read
-  private[this] var last: Int = 0
+final class FastBytesReader(bytes: ByteInput) extends RetractReader {
+  private[this] var retracted: Boolean = false
+  private[this] var last: Int          = -1
 
   // if surrogate is non-zero it holds the lower surrogate of a UTF-16 that must
   // be returned by the next read instead of querying the array. See
   // https://en.wikipedia.org/wiki/UTF-16
   private[this] var lowSurrogate: Int = 0
 
-  @inline def eof(): Boolean = lowSurrogate == 0 && i >= utf8.length
+  @inline def eof(): Boolean = !retracted && lowSurrogate == 0 && bytes.eof()
 
-  @inline private[this] def readByte_(): Int = {
-    val b = utf8(i)
-    i += 1
-    b & 0xFF
-  }
-  @inline private[this] def check(): Unit =
-    if (eof()) {
-      i += 1
-      last = 1
-      throw UnexpectedEnd
-    }
   @inline private[this] def readByte(): Int = {
-    check()
-    readByte_()
+    val b = bytes.read()
+    if (b == -1) throw UnexpectedEnd
+    b
   }
 
   private[this] def read_(): Char = {
+    if (retracted) {
+      retracted = false
+      return last.toChar
+    }
     if (lowSurrogate > 0) {
       val c = lowSurrogate.toChar
       lowSurrogate = 0
       return c
     }
-    val a = readByte_()
+    val a = readByte()
 
     // https://en.wikipedia.org/wiki/UTF-8
     // 0x3F = 0011 1111
@@ -146,13 +138,11 @@ final class FastBytesReader(utf8: Array[Byte]) extends RetractReader {
     ((a >> 4): @switch) match {
       // 0xxxxxxx
       case 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 =>
-        last = 1
         a.toChar
 
       // 1100xxxx 1101xxxx
       case 12 | 13 =>
         val b = readByte()
-        last = 2
 
         (((a & 0x1F) << 6) | (b & 0x3F)).toChar
 
@@ -160,7 +150,6 @@ final class FastBytesReader(utf8: Array[Byte]) extends RetractReader {
       case 14 =>
         val b = readByte()
         val c = readByte()
-        last = 3
 
         (((a & 0x0F) << 12) | ((b & 0x3F) << 6) | (c & 0x3F)).toChar
 
@@ -169,7 +158,6 @@ final class FastBytesReader(utf8: Array[Byte]) extends RetractReader {
         val b = readByte()
         val c = readByte()
         val d = readByte()
-        last = 4
 
         val codepoint = ((a & 0x07) << 18) | ((b & 0x3F) << 12) | (c & 0x3F) << 6 | (d & 0x3F)
         lowSurrogate = Character.lowSurrogate(codepoint)
@@ -178,27 +166,24 @@ final class FastBytesReader(utf8: Array[Byte]) extends RetractReader {
       case _ =>
         throw UnexpectedEnd
     }
-
   }
 
   override def read(): Int = {
     if (eof()) {
-      // no exceptions, so faster than check()
-      i += 1
-      last = 1
+      last = -1
       return -1
     }
-    read_()
+    val c = read_()
+    last = c
+    c
   }
 
   override def readChar(): Char = {
-    check()
-    read_()
+    val c = read_()
+    last = c
+    c
   }
 
-  override def retract(): Unit = {
-    if (i <= 0) throw new IllegalStateException("if you see this a dev made a mistake")
-    lowSurrogate = 0
-    i -= last
-  }
+  override def retract(): Unit =
+    retracted = true
 }

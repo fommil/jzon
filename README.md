@@ -294,8 +294,8 @@ There are two main factors to consider when comparing the performance of JSON li
 
 Here are JMH benchmarks (higher `ops/sec` is better, lower `MB/sec` is better) on a standard Google Maps API performance-testing dataset (stressing array and number parsing). Note that a better metric for memory usage might be `MB` per decode or encode, since it can be misleading to have the same `MB/sec` but be processing more JSON: the library that consumes the least amount of memory is likely to have highest throughput.
 
-<!-- jmh:run -prof gc GoogleMaps.*Success1 -->
-<!-- jmh:run -prof gc GoogleMaps.*encode* -->
+<!-- Jmh/run -prof gc GoogleMaps.*Success1 -->
+<!-- Jmh/run -prof gc GoogleMaps.*encode* -->
 
 ```
        Decoding                    | Encoding
@@ -307,8 +307,8 @@ play    5756 ±  47   2260 ± 19     |  6669 ± 160  2677 ± 64
 
 on a standard Twitter API performance-testing dataset (stressing nested case classes with lots of fields)
 
-<!-- jmh:run -prof gc Twitter.*Success1 -->
-<!-- jmh:run -prof gc Twitter.*encode* -->
+<!-- Jmh/run -prof gc Twitter.*Success1 -->
+<!-- Jmh/run -prof gc Twitter.*encode* -->
 
 ```
        Decoding                    | Encoding
@@ -320,8 +320,8 @@ play    5256 ± 165   1231 ± 39     | 15580 ± 314  2260 ± 45
 
 on a standard GeoJSON performance-testing dataset (stressing nested sealed traits that use a discriminator). Note that the `alt` decoder is manually written to avoid using the default discriminator handling.
 
-<!-- jmh:run -prof gc GeoJSON.*Success1 -->
-<!-- jmh:run -prof gc GeoJSON.*encode* -->
+<!-- Jmh/run -prof gc GeoJSON.*Success1 -->
+<!-- Jmh/run -prof gc GeoJSON.*encode* -->
 
 ```
           Decoding                    | Encoding
@@ -334,8 +334,8 @@ play        704 ±   9   3946 ±  55    | 2587 ± 24     1091 ± 10
 
 and on a standard synthetic performance-testing dataset (stressing nested recursive types)
 
-<!-- jmh:run -prof gc Synthetic.*Success -->
-<!-- jmh:run -prof gc Synthetic.*encode* -->
+<!-- Jmh/run -prof gc Synthetic.*Success -->
+<!-- Jmh/run -prof gc Synthetic.*encode* -->
 
 ```
        Decoding                    | Encoding
@@ -363,7 +363,7 @@ The best way to mitigate against message size attacks is to cap the `Content-Len
 
 For all the remaining attacks, we will cap the malicious message size to 100KB (the original message is 25KB) and compare the attacks against this baseline. The benchmark results for the original (unedited) payload are given in parentheses, and we can immediately see a reduction in the ops/sec for all frameworks, accompanied by a reduction in memory usage.
 
-<!-- jmh:run -prof gc GoogleMaps.*Attack0 -->
+<!-- Jmh/run -prof gc GoogleMaps.*Attack0 -->
 
 ```
        ops/sec        MB/sec
@@ -378,7 +378,7 @@ Most JSON libraries (but not `zio-json`) first create a representation of the JS
 
 An intermediate AST enables attack vectors that insert redundant data, for example in our Google Maps dataset we can add a new field called `redundant` at top-level containing a 60K `String`. If we do this, and run the benchmarks, we see that Circe is heavily impacted, with a 75% reduction in capacity and an increase in memory usage. Play is also impacted, although not as severely. `zio-json`'s ops/sec are reduced but the memory usage is in line which means that throughput is unlikely to be affected by this kind of attack.
 
-<!-- jmh:run -prof gc GoogleMaps.*Attack1 -->
+<!-- Jmh/run -prof gc GoogleMaps.*Attack1 -->
 
 ```
        ops/sec       MB/sec
@@ -399,7 +399,7 @@ JSON libraries that use an intermediate AST often store JSON objects as a string
 
 In this malicious payload, we add redundant fields that have hashcode collisions, up to 4 collisions per field; we could add more if we used a bruteforce search.
 
-<!-- jmh:run -prof gc GoogleMaps.*Attack2 -->
+<!-- Jmh/run -prof gc GoogleMaps.*Attack2 -->
 
 Again, `zio-json` completely mitigates this attack if the `@json.no_extra_fields` annotation is used. Note that even if Circe and Play rejected payloads of this nature, it would be too late because the attack happens at the AST layer, not the decoders. However, for the sake of comparison, let's turn off the `zio-json` mitigation:
 
@@ -441,6 +441,20 @@ circe  4529 ( 7456)  2037 (1533)
 This attack is very effective in schemas with lots of numbers, causing ops/sec to be halved with a 33% increase in memory usage.
 
 `zio-json` is resistant to a wide range of number based attacks because it uses a from-scratch number parser that will exit early when the number of bits of any number exceeds 128 bits, which can be customised by the system property `zio.json.number.bits`.
+
+# Async Parsing
+
+`zio-json` can be used to read (potentially) infinite data streams of JSON objects and arrays, see the `zio.json.async` package and tests for more details.
+
+Benchmark results for reading 1,000 of the above Google Maps payloads from disk can be directly compared to fs2 and circe's async parsing.
+
+<!-- Jmh/run -prof gc Google.*Big -->
+
+```
+                  ops/sec       MB/sec
+zio (`java.io`)     8 ± 0       1000 ±   6
+circe (`fs2.io`)    4 ± 2       1057 ± 612
+```
 
 # Even Moar Performance
 
