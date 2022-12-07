@@ -62,6 +62,13 @@ class EncoderTest extends Test {
     }
   }
 
+  object examplegeneric {
+    case class Genericy[A](a: A)
+    object Genericy {
+      implicit def encoder[A: Encoder]: Encoder[Genericy[A]] = Encoder.derived
+    }
+  }
+
   def testPrimitives = {
     assertEquals("\"hello world\"", "hello world".toJson)
     assertEquals("\"hello\\nworld\"", "hello\nworld".toJson)
