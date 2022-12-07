@@ -63,12 +63,12 @@ object CodeGen {
          |    }""".stripMargin
     }
 
-    s"""package zio.json
+    s"""package jzon
        |
        |import scala.annotation._
        |import shapely._
        |
-       |private[json] trait EncoderGenerated {
+       |private[jzon] trait EncoderGenerated {
        |  implicit def caseclass0[A]: Encoder[CaseClass0[A]] = new Encoder[CaseClass0[A]] {
        |    override def unsafeEncode(a: CaseClass0[A], indent: Option[Int], out: java.io.Writer): Unit = out.write("{}")
        |  }
@@ -139,14 +139,14 @@ object CodeGen {
          |    }""".stripMargin
     }
 
-    s"""package zio.json
+    s"""package jzon
        |
        |import shapely._
-       |import zio.json.internal._
+       |import jzon.internal._
        |
        |import Decoder.JsonError
        |
-       |private[json] trait DecoderGenerated {
+       |private[jzon] trait DecoderGenerated {
        |
        |  implicit def caseclass0[A](implicit M: Meta[A]): Decoder[CaseClass0[A]] = new Decoder[CaseClass0[A]] {
        |    val no_extra = M.annotations.collectFirst { case _: no_extra_fields => () }.isDefined

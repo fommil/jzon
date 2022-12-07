@@ -1,5 +1,5 @@
-organization := "dev.zio"
-name := "zio-json"
+organization := "com.fommil"
+name := "jzon"
 
 ThisBuild / crossScalaVersions := Seq("2.13.10", "2.12.17", "3.2.1")
 ThisBuild / scalaVersion := crossScalaVersions.value.head
@@ -9,20 +9,11 @@ scalacOptions ++= Seq(
   "-deprecation"
 )
 
-lazy val shapely =
-  ProjectRef(uri("https://gitlab.com/fommil/shapely.git#f4135d96faf9cfa8d63d6fd7706666eb6243556f"), "shapely")
-lazy val root = (project in file("."))
-  .dependsOn(shapely)
-  .settings(
-    // https://www.yourkit.com/docs/java/help/startup_options.jsp
-    // Jmh / neoJmhYourkit := Seq("disabletracing,disablenatives,exceptions=disable,allocsampled")
-  )
-
 Compile / sourceGenerators += Def.task {
   val dir = (Compile / sourceManaged).value
   val gen = List(
-    CodeGen.encoders -> dir / "zio" / "json" / "EncoderGenerated.scala",
-    CodeGen.decoders -> dir / "zio" / "json" / "DecoderGenerated.scala"
+    CodeGen.encoders -> dir / "jzon" / "EncoderGenerated.scala",
+    CodeGen.decoders -> dir / "jzon" / "DecoderGenerated.scala"
   )
   gen.foreach {
     case (content, file) => IO.write(file, content)
@@ -30,11 +21,9 @@ Compile / sourceGenerators += Def.task {
   gen.map(_._2)
 }.taskValue
 
-libraryDependencies += "org.scalaz" %% "scalaz-core" % "7.3.6" intransitive ()
-libraryDependencies += "eu.timepit" %% "refined"     % "0.9.28" intransitive ()
-
 libraryDependencies ++= Seq(
-  "com.novocode" % "junit-interface" % "0.11"   % Test,
+  "com.fommil"   %% "shapely"        % "1.0.0",
+  "com.novocode" % "junit-interface" % "0.11" % Test,
   "junit"        % "junit"           % "4.13.2" % Test
 )
 crossPaths := false // https://github.com/sbt/junit-interface/issues/35
