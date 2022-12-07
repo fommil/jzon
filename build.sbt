@@ -26,7 +26,7 @@ libraryDependencies ++= Seq(
   "com.novocode" % "junit-interface" % "0.11" % Test,
   "junit"        % "junit"           % "4.13.2" % Test
 )
-crossPaths := false // https://github.com/sbt/junit-interface/issues/35
+Test / crossPaths := false // https://github.com/sbt/junit-interface/issues/35
 testOptions += Tests.Argument(TestFrameworks.JUnit, "-v")
 fork := true
 
@@ -55,3 +55,20 @@ libraryDependencies ++= {
 } //////////////////////////////
 
 addCommandAlias("fmt", "all scalafmtSbt scalafmt test:scalafmt jmh:scalafmt")
+
+// +publishSigned ; sonatypeBundleRelease
+
+ThisBuild / licenses := List("BSD-2" -> url("https://opensource.org/licenses/BSD-2-Clause"))
+Compile / resources += baseDirectory.value / "LICENSE"
+ThisBuild / publishTo := sonatypePublishToBundle.value
+
+homepage := Some(url("https://github.com/fommil/jzon"))
+scmInfo := Some(
+  ScmInfo(
+    url("https://github.com/fommil/jzon"),
+    "scm:git@github.com:fommil/jzon.git"
+  )
+)
+developers := List(
+  Developer(id="fommil", name="Sam Halliday", email="sam.halliday@gmail.com", url=url("https://fommil.com"))
+)
