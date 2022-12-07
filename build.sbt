@@ -1,7 +1,7 @@
 organization := "dev.zio"
 name := "zio-json"
 
-ThisBuild / crossScalaVersions := Seq("2.13.8", "2.12.15", "3.1.1")
+ThisBuild / crossScalaVersions := Seq("2.13.10", "2.12.17", "3.2.1")
 ThisBuild / scalaVersion := crossScalaVersions.value.head
 
 scalacOptions ++= Seq(
