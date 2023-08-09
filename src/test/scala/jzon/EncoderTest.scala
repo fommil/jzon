@@ -69,6 +69,11 @@ class EncoderTest extends Test {
     }
   }
 
+  case class Stringy(value: String)
+  object Stringy {
+    implicit val encoder: FieldEncoder[Stringy] = FieldEncoder[String].contramap(_.value)
+  }
+
   def testPrimitives = {
     assertEquals("\"hello world\"", "hello world".toJson)
     assertEquals("\"hello\\nworld\"", "hello\nworld".toJson)
@@ -182,6 +187,11 @@ class EncoderTest extends Test {
     assertEquals("{\n  \"hint\" : \"Child1\"}", (Child1(): Parent).toJsonPretty)
     assertEquals("{\n  \"hint\" : \"Abel\"}", (Child2(None): Parent).toJsonPretty)
     assertEquals("{\n  \"hint\" : \"Abel\",\n  \"s\" : \"hello\"\n}", (Child2(Some("hello")): Parent).toJsonPretty)
+  }
+
+  def testStringy = {
+    val expected = """"wibble""""
+    assertEquals(expected, Stringy("wibble").toJsonPretty)
   }
 
 }

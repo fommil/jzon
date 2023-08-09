@@ -1,7 +1,7 @@
 organization := "com.fommil"
 name := "jzon"
 
-ThisBuild / crossScalaVersions := Seq("2.13.10", "2.12.17", "3.2.1")
+ThisBuild / crossScalaVersions := Seq("2.13.11", "2.12.18", "3.3.0")
 ThisBuild / scalaVersion := crossScalaVersions.value.head
 
 scalacOptions ++= Seq(

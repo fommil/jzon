@@ -37,7 +37,7 @@ trait Encoder[A] { self =>
   def isNothing(a: A): Boolean = false
 }
 
-object Encoder extends EncoderGenerated with EncoderLowPriority1 {
+object Encoder extends EncoderGenerated with EncoderLowPriority1 with EncoderLowPriority2 {
   def apply[A](implicit a: Encoder[A]): Encoder[A] = a
 
   def derived[A, B](implicit S: shapely.Shapely[A, B], B: Encoder[B]): Encoder[A] = B.contramap(S.to)
@@ -194,6 +194,13 @@ private[jzon] trait EncoderLowPriority1 {
 
 }
 
+private[jzon] trait EncoderLowPriority2 {
+  this: Encoder.type =>
+
+  implicit def field[A](implicit A: FieldEncoder[A]): Encoder[A] = string.contramap(A.unsafeEncodeField(_))
+
+}
+
 /** When encoding a JSON Object, we only allow keys that implement this interface. */
 trait FieldEncoder[A] { self =>
 
@@ -206,6 +213,8 @@ trait FieldEncoder[A] { self =>
   def unsafeEncodeField(in: A): String
 }
 object FieldEncoder {
+  def apply[A](implicit A: FieldEncoder[A]): FieldEncoder[A] = A
+
   implicit val string: FieldEncoder[String] = new FieldEncoder[String] {
     def unsafeEncodeField(in: String): String = in
   }

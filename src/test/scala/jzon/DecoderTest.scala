@@ -55,6 +55,11 @@ class DecoderTest extends Test {
     }
   }
 
+  case class Stringy(value: String)
+  object Stringy {
+    implicit val decoder: FieldDecoder[Stringy] = FieldDecoder[String].map(Stringy(_))
+  }
+
   def testPrimitives =
     // this big integer consumes more than 128 bits
     assertEquals(
@@ -174,5 +179,10 @@ class DecoderTest extends Test {
       val input = TestUtils.getResourceAsString(res)
       assert(parser.decode[JsValue](input).isRight, res)
     }
+
+  def testStringy = {
+    val expected = Stringy("wibble")
+    assertEquals(Right(expected), parser.decode[Stringy](""""wibble""""))
+  }
 
 }

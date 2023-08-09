@@ -78,7 +78,7 @@ trait Decoder[A] { self =>
   def unsafeDecode(trace: List[JsonError], in: RetractReader): A
 }
 
-object Decoder extends DecoderGenerated with DecoderLowPriority1 {
+object Decoder extends DecoderGenerated with DecoderLowPriority1 with DecoderLowPriority2 {
   def apply[A](implicit a: Decoder[A]): Decoder[A] = a
 
   def derived[A, B](implicit S: shapely.Shapely[A, B], B: Decoder[B]): Decoder[A] = B.map(S.from)
@@ -308,6 +308,17 @@ private[jzon] trait DecoderLowPriority1 {
 
 }
 
+private[jzon] trait DecoderLowPriority2 {
+
+  implicit def field[A](implicit A: FieldDecoder[A]): Decoder[A] = new Decoder[A] {
+    override def unsafeDecode(trace: List[JsonError], in: RetractReader): A = {
+      val str = Decoder.string.unsafeDecode(trace, in)
+      A.unsafeDecodeField(trace, str)
+    }
+  }
+
+}
+
 /** When decoding a JSON Object, we only allow the keys that implement this interface. */
 trait FieldDecoder[A] { self =>
   final def widen[B >: A]: FieldDecoder[B] =
@@ -331,6 +342,8 @@ trait FieldDecoder[A] { self =>
   def unsafeDecodeField(trace: List[JsonError], in: String): A
 }
 object FieldDecoder {
+  def apply[A](implicit A: FieldDecoder[A]): FieldDecoder[A] = A
+
   implicit val string: FieldDecoder[String] = new FieldDecoder[String] {
     def unsafeDecodeField(trace: List[JsonError], in: String): String = in
   }
